@@ -2,7 +2,7 @@
 
 use std::ptr::NonNull;
 
-use dwarfs_sys::{dwarfs_c_dir, dwarfs_c_dirent};
+use dwarfs_t_sys::{dwarfs_c_dir, dwarfs_c_dirent};
 
 use crate::error::DwarfsError;
 use crate::metadata::FileType;
@@ -56,7 +56,7 @@ impl Iterator for ReadDir<'_> {
         // SAFETY: `dir` is a live iterator handle; `out` points to valid
         // stack storage. The returned name pointer is borrowed from the
         // iterator and copied into an owned String before the next call.
-        let rc = unsafe { dwarfs_sys::dwarfs_c_readdir(self.dir.as_ptr(), &mut out) };
+        let rc = unsafe { dwarfs_t_sys::dwarfs_c_readdir(self.dir.as_ptr(), &mut out) };
         match rc {
             1 => {
                 let name = if out.name.is_null() {
@@ -86,7 +86,7 @@ impl Iterator for ReadDir<'_> {
 impl Drop for ReadDir<'_> {
     fn drop(&mut self) {
         // SAFETY: `dir` is a live iterator handle we own.
-        unsafe { dwarfs_sys::dwarfs_c_closedir(self.dir.as_ptr()) }
+        unsafe { dwarfs_t_sys::dwarfs_c_closedir(self.dir.as_ptr()) }
     }
 }
 

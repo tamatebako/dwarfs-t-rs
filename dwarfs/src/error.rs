@@ -56,8 +56,8 @@ impl DwarfsError {
         // pointers are borrowed and valid until the next FFI call on this
         // thread, which cannot interleave here.
         unsafe {
-            let errno = dwarfs_sys::dwarfs_c_errno();
-            let msg = dwarfs_sys::dwarfs_c_error_message();
+            let errno = dwarfs_t_sys::dwarfs_c_errno();
+            let msg = dwarfs_t_sys::dwarfs_c_error_message();
             let message = if msg.is_null() {
                 String::new()
             } else {

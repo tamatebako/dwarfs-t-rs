@@ -2,7 +2,7 @@
 //! a fast high-compression read-only file system.
 //!
 //! This crate wraps the stable C ABI (`libdwarfs_c`) of the DwarFS reader
-//! via the [`dwarfs-sys`] FFI crate. It exposes a small, idiomatic,
+//! via the [`dwarfs-t-sys`] FFI crate. It exposes a small, idiomatic,
 //! read-only API:
 //!
 //! - open an image from a file, from memory, or from a file region
@@ -43,7 +43,7 @@
 //! # License note
 //!
 //! The Rust sources of this crate are `MIT OR Apache-2.0`. The native
-//! library linked through `dwarfs-sys` (dwarfs-t / DwarFS) is **GPL-3.0**:
+//! library linked through `dwarfs-t-sys` (dwarfs-t / DwarFS) is **GPL-3.0**:
 //! binaries that statically link it are subject to GPL-3.0 terms. See the
 //! repository README for details.
 

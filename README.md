@@ -37,8 +37,8 @@ change what Rust sees.
 
 | crate | purpose |
 |---|---|
-| [`dwarfs`](dwarfs/) | Safe wrapper: `Filesystem::open` / `open_memory` / `open_region`, `stat`, `pread`, `read_dir` iterator, `image_info_json`, `DwarfsError` mapping the errno channel. |
-| [`dwarfs-sys`](dwarfs-sys/) | Hand-written `extern "C"` declarations for the 16-function C ABI (hand-written because the surface is small and frozen — no bindgen/libclang needed; an `abi_check.c` with `_Static_assert`s pins the layout at build time) plus the vendored-source build. |
+| [`dwarfs-t`](dwarfs/) | Safe wrapper: `Filesystem::open` / `open_memory` / `open_region`, `stat`, `pread`, `read_dir` iterator, `image_info_json`, `DwarfsError` mapping the errno channel. |
+| [`dwarfs-t-sys`](dwarfs-sys/) | Hand-written `extern "C"` declarations for the 16-function C ABI (hand-written because the surface is small and frozen — no bindgen/libclang needed; an `abi_check.c` with `_Static_assert`s pins the layout at build time) plus the vendored-source build. |
 
 ## Requirements
 
@@ -131,3 +131,15 @@ reads, and each directory iterator is independent state).
 
   DwarFS's bundled third-party libraries carry their own (permissive)
   licenses; see the dwarfs-t repository for the full list.
+
+## Why dwarfs-t-rs (and not dwarfs-rs)
+
+This binding targets **dwarfs-t**, tamatebako's fork of DwarFS (by Marcus
+Holland-Moritz), and not upstream DwarFS:
+
+- dwarfs-t adds an additional FlatBuffers-based image format that upstream
+  DwarFS cannot read (a real format divergence, not just a patch series).
+- `libdwarfs` / `libdwarfs_c` (the supported library and C ABI this crate
+  binds) exist only in dwarfs-t — upstream ships tools, not a library.
+- The C++ side removes the Facebook folly/thrift dependency (the "t" fork's
+  original purpose); DwarFS itself is mhx's project, not Facebook's.

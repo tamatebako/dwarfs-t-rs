@@ -1,5 +1,5 @@
 [package]
-name = "dwarfs-sys"
+name = "dwarfs-t-sys"
 description = "Raw FFI bindings to libdwarfs_c, the stable C ABI of the DwarFS reader (dwarfs-t)"
 version.workspace = true
 edition.workspace = true

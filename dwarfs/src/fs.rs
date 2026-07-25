@@ -4,7 +4,7 @@ use std::ffi::{CStr, CString};
 use std::path::Path;
 use std::ptr::NonNull;
 
-use dwarfs_sys::{dwarfs_c_filesystem, dwarfs_c_stat, DWARFS_C_OFFSET_AUTO};
+use dwarfs_t_sys::{dwarfs_c_filesystem, dwarfs_c_stat, DWARFS_C_OFFSET_AUTO};
 
 use crate::dir::ReadDir;
 use crate::error::DwarfsError;
@@ -80,7 +80,7 @@ impl Filesystem {
     pub fn open(path: impl AsRef<Path>) -> Result<Self, DwarfsError> {
         let path = path_cstring(path.as_ref())?;
         // SAFETY: path is a valid NUL-terminated string.
-        let handle = unsafe { dwarfs_sys::dwarfs_c_open(path.as_ptr()) };
+        let handle = unsafe { dwarfs_t_sys::dwarfs_c_open(path.as_ptr()) };
         Self::from_raw(handle, None)
     }
 
@@ -107,7 +107,7 @@ impl Filesystem {
         // because we clamp it.
         let length = i64::try_from(length)
             .map_err(|_| DwarfsError::invalid_input("length does not fit into i64"))?;
-        let handle = unsafe { dwarfs_sys::dwarfs_c_open_region(path.as_ptr(), offset, length) };
+        let handle = unsafe { dwarfs_t_sys::dwarfs_c_open_region(path.as_ptr(), offset, length) };
         Self::from_raw(handle, None)
     }
 
@@ -124,7 +124,7 @@ impl Filesystem {
         // SAFETY: `owned` outlives the handle (it is stored in the
         // Filesystem and dropped after close); the C ABI only borrows it.
         let handle =
-            unsafe { dwarfs_sys::dwarfs_c_open_memory(owned.as_ptr().cast(), owned.len()) };
+            unsafe { dwarfs_t_sys::dwarfs_c_open_memory(owned.as_ptr().cast(), owned.len()) };
         // Ensure the copy survives even on failure: it is dropped here if
         // from_raw errors, which is fine because the handle is NULL then.
         owned.shrink_to_fit();
@@ -156,7 +156,7 @@ impl Filesystem {
         // SAFETY: handle is live; path is a valid C string; raw points to
         // valid stack storage.
         let rc =
-            unsafe { dwarfs_sys::dwarfs_c_stat(self.handle.as_ptr(), path.as_ptr(), &mut raw) };
+            unsafe { dwarfs_t_sys::dwarfs_c_stat(self.handle.as_ptr(), path.as_ptr(), &mut raw) };
         if rc != 0 {
             return Err(DwarfsError::from_last_error());
         }
@@ -184,7 +184,7 @@ impl Filesystem {
         // SAFETY: handle is live; path is a valid C string; buf is valid
         // for writes of buf.len() bytes.
         let n = unsafe {
-            dwarfs_sys::dwarfs_c_pread(
+            dwarfs_t_sys::dwarfs_c_pread(
                 self.handle.as_ptr(),
                 path.as_ptr(),
                 buf.as_mut_ptr().cast(),
@@ -210,7 +210,7 @@ impl Filesystem {
     pub fn read_dir(&self, path: &str) -> Result<ReadDir<'_>, DwarfsError> {
         let path = lookup_cstring(path)?;
         // SAFETY: handle is live; path is a valid C string.
-        let dir = unsafe { dwarfs_sys::dwarfs_c_opendir(self.handle.as_ptr(), path.as_ptr()) };
+        let dir = unsafe { dwarfs_t_sys::dwarfs_c_opendir(self.handle.as_ptr(), path.as_ptr()) };
         match NonNull::new(dir) {
             Some(dir) => Ok(ReadDir::new(self, dir)),
             None => Err(DwarfsError::from_last_error()),
@@ -224,7 +224,7 @@ impl Filesystem {
     pub fn image_info_json(&self) -> Result<String, DwarfsError> {
         // SAFETY: handle is live. The returned pointer is heap-allocated by
         // the library and must be released with dwarfs_c_free.
-        let raw = unsafe { dwarfs_sys::dwarfs_c_image_info_json(self.handle.as_ptr()) };
+        let raw = unsafe { dwarfs_t_sys::dwarfs_c_image_info_json(self.handle.as_ptr()) };
         if raw.is_null() {
             return Err(DwarfsError::from_last_error());
         }
@@ -233,7 +233,7 @@ impl Filesystem {
             .to_string_lossy()
             .into_owned();
         // SAFETY: raw was returned by dwarfs_c_image_info_json.
-        unsafe { dwarfs_sys::dwarfs_c_free(raw.cast()) };
+        unsafe { dwarfs_t_sys::dwarfs_c_free(raw.cast()) };
         Ok(json)
     }
 
@@ -241,13 +241,13 @@ impl Filesystem {
     /// `major * 10000 + minor * 100 + patch`.
     pub fn version() -> i32 {
         // SAFETY: always safe to call.
-        unsafe { dwarfs_sys::dwarfs_c_version() }
+        unsafe { dwarfs_t_sys::dwarfs_c_version() }
     }
 
     /// The library version string (e.g. the git description).
     pub fn version_string() -> &'static str {
         // SAFETY: the returned pointer refers to a static C string.
-        let ptr = unsafe { dwarfs_sys::dwarfs_c_version_string() };
+        let ptr = unsafe { dwarfs_t_sys::dwarfs_c_version_string() };
         if ptr.is_null() {
             return "unknown";
         }
@@ -259,7 +259,7 @@ impl Drop for Filesystem {
     fn drop(&mut self) {
         // SAFETY: handle is live and owned by us; directory iterators borrow
         // the Filesystem, so none can outlive it.
-        unsafe { dwarfs_sys::dwarfs_c_close(self.handle.as_ptr()) }
+        unsafe { dwarfs_t_sys::dwarfs_c_close(self.handle.as_ptr()) }
     }
 }
 

@@ -1,6 +1,6 @@
 //! Stat-equivalent metadata and file type classification.
 
-use dwarfs_sys::{
+use dwarfs_t_sys::{
     dwarfs_c_stat, DWARFS_C_FILE_DIRECTORY, DWARFS_C_FILE_OTHER, DWARFS_C_FILE_REGULAR,
     DWARFS_C_FILE_SYMLINK, DWARFS_C_FILE_UNKNOWN,
 };
