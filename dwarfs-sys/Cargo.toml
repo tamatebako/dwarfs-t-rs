@@ -1,0 +1,23 @@
+[package]
+name = "dwarfs-sys"
+description = "Raw FFI bindings to libdwarfs_c, the stable C ABI of the DwarFS reader (dwarfs-t)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+keywords = ["dwarfs", "ffi", "sys", "filesystem", "archive"]
+categories = ["external-ffi-bindings", "filesystem"]
+links = "dwarfs_c"
+build = "build.rs"
+
+[features]
+# `vendored` (the only mode in v1): build libdwarfs_c and its whole static
+# dependency closure from the vendored dwarfs-t git submodule via CMake/vcpkg.
+# A `system` mode (link a prebuilt libdwarfs_c, e.g. via pkg-config) is planned.
+default = ["vendored"]
+vendored = []
+
+[build-dependencies]
+cc = "1"

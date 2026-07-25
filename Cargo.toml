@@ -1,0 +1,16 @@
+[workspace]
+resolver = "2"
+members = ["dwarfs-sys", "dwarfs"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.74"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/tamatebako/dwarfs-rs"
+homepage = "https://github.com/tamatebako/dwarfs-rs"
+
+[profile.release]
+# The native dep chain (dwarfs-t + vcpkg static libs) dominates binary size;
+# keep the Rust part lean by default.
+lto = "thin"

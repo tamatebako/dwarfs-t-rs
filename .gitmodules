@@ -1,0 +1,3 @@
+[submodule "dwarfs-t"]
+	path = dwarfs-t
+	url = ../dwarfs-t
