@@ -1,0 +1,16 @@
+[package]
+name = "dwarfs"
+description = "Safe Rust bindings to the DwarFS read-only filesystem reader (via libdwarfs_c)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+keywords = ["dwarfs", "filesystem", "archive", "read-only", "compression"]
+categories = ["filesystem", "api-bindings"]
+readme = "../README.md"
+
+[dependencies]
+dwarfs-sys = { version = "0.1.0", path = "../dwarfs-sys" }
+libc = "0.2"
