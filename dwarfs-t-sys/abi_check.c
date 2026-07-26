@@ -39,6 +39,33 @@ _Static_assert(DWARFS_C_FILE_OTHER == 4, "FILE_OTHER value");
 /* DWARFS_C_OFFSET_AUTO */
 _Static_assert(DWARFS_C_OFFSET_AUTO == -1, "OFFSET_AUTO value");
 
+/* struct dwarfs_c_writer_options layout (pinned in Rust as
+   #[repr(C)] dwarfs_c_writer_options) */
+_Static_assert(sizeof(dwarfs_c_writer_options) == 24,
+               "dwarfs_c_writer_options size drift");
+_Static_assert(offsetof(dwarfs_c_writer_options, struct_version) == 0,
+               "struct_version offset");
+_Static_assert(offsetof(dwarfs_c_writer_options, compression) == 4,
+               "compression offset");
+_Static_assert(offsetof(dwarfs_c_writer_options, compression_level) == 8,
+               "compression_level offset");
+_Static_assert(offsetof(dwarfs_c_writer_options, block_size_bits) == 12,
+               "block_size_bits offset");
+_Static_assert(offsetof(dwarfs_c_writer_options, enable_categorizer) == 16,
+               "enable_categorizer offset");
+_Static_assert(offsetof(dwarfs_c_writer_options, num_workers) == 20,
+               "num_workers offset");
+
+/* struct_version stamp */
+_Static_assert(DWARFS_C_WRITER_OPTIONS_VERSION == 1,
+               "WRITER_OPTIONS_VERSION value");
+
+/* enum dwarfs_c_compression values */
+_Static_assert(DWARFS_C_COMPRESSION_NONE == 0, "COMPRESSION_NONE value");
+_Static_assert(DWARFS_C_COMPRESSION_ZSTD == 1, "COMPRESSION_ZSTD value");
+_Static_assert(DWARFS_C_COMPRESSION_LZMA == 2, "COMPRESSION_LZMA value");
+_Static_assert(DWARFS_C_COMPRESSION_BROTLI == 3, "COMPRESSION_BROTLI value");
+
 int dwarfs_c_abi_check(void)
 {
   return 0;
