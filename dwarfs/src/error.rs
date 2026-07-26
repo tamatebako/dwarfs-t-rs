@@ -17,6 +17,10 @@ pub enum ErrorKind {
     OutOfMemory,
     /// `EIO` — image parse/read failure (the message carries details).
     Io,
+    /// `ENOTSUP` — the operation is not supported by this build; reported
+    /// for every operation when the crate is compiled without the `vendored`
+    /// feature (the pure-cargo skeleton links no native library).
+    NotSupported,
     /// Any other errno value.
     Other(i32),
 }
@@ -30,6 +34,7 @@ impl ErrorKind {
             libc::EINVAL => ErrorKind::InvalidInput,
             libc::ENOMEM => ErrorKind::OutOfMemory,
             libc::EIO => ErrorKind::Io,
+            libc::ENOTSUP => ErrorKind::NotSupported,
             other => ErrorKind::Other(other),
         }
     }
@@ -108,6 +113,7 @@ impl DwarfsError {
             ErrorKind::InvalidInput => "invalid input".into(),
             ErrorKind::OutOfMemory => "out of memory".into(),
             ErrorKind::Io => "i/o error".into(),
+            ErrorKind::NotSupported => "not supported".into(),
             ErrorKind::Other(e) => format!("error {e}"),
         }
     }

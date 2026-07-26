@@ -1,6 +1,6 @@
 [package]
 name = "dwarfs-t-sys"
-description = "Raw FFI bindings to libdwarfs_c, the stable C ABI of the DwarFS reader (dwarfs-t)"
+description = "Raw FFI bindings to libdwarfs_c, the stable C ABI of the DwarFS reader/writer library (dwarfs-t)"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -9,15 +9,39 @@ repository.workspace = true
 homepage.workspace = true
 keywords = ["dwarfs", "ffi", "sys", "filesystem", "archive"]
 categories = ["external-ffi-bindings", "filesystem"]
+readme = "../README.md"
 links = "dwarfs_c"
 build = "build.rs"
+# Never ship a vendored dwarfs-t checkout or native build trees inside the
+# package: crates.io consumers point DWARFS_RS_DWARFS_T_SOURCE at their own
+# dwarfs-t checkout (see README) or use the no-default-features skeleton.
+exclude = ["/dwarfs-t", "/target", "/o"]
 
 [features]
-# `vendored` (the only mode in v1): build libdwarfs_c and its whole static
-# dependency closure from the vendored dwarfs-t git submodule via CMake/vcpkg.
-# A `system` mode (link a prebuilt libdwarfs_c, e.g. via pkg-config) is planned.
+# `vendored` (default): build libdwarfs_c and its whole static dependency
+# closure from dwarfs-t sources via CMake/vcpkg — in the git repo that is the
+# pinned `dwarfs-t` submodule; for the crates.io package it is the checkout
+# pointed to by DWARFS_RS_DWARFS_T_SOURCE. A `system` mode (link a prebuilt
+# libdwarfs_c, e.g. via pkg-config) is planned.
+#
+# With default features OFF this is a pure-cargo skeleton: nothing native is
+# built or linked, and every ABI entry point is a Rust stub that fails with
+# ENOTSUP, so the safe `dwarfs-t` crate compiles, links and reports
+# "operation not supported" for every operation. docs.rs builds are handled
+# separately: the build script detects the DOCS_RS environment and skips the
+# native build (rustdoc never links it).
 default = ["vendored"]
 vendored = []
 
+[dependencies]
+# Used only by the skeleton stubs (platform-correct ENOTSUP value).
+libc = "0.2"
+
 [build-dependencies]
 cc = "1"
+
+[package.metadata.docs.rs]
+# docs.rs cannot run CMake/vcpkg. The build script skips the native build
+# under the DOCS_RS env var, so the default `vendored` feature stays enabled
+# and the documented API is the full one.
+all-features = true

@@ -4,6 +4,10 @@
 //! Covers the writer round-trip (tree structure + full file contents via
 //! stat/pread/read_dir), the option paths, and the errno contract
 //! (EEXIST / EALREADY / EINVAL / ENOENT / ENOTDIR).
+//!
+//! Requires the native library: without `vendored` every operation fails
+//! with ENOTSUP, so the whole file is compiled out in skeleton builds.
+#![cfg(feature = "vendored")]
 
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};

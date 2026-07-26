@@ -1,8 +1,12 @@
-//! Integration tests for the safe `dwarfs` wrapper against the
+//! Integration tests for the safe `dwarfs-t` wrapper against the
 //! `tests/fixtures/data.dwarfs` image (borrowed from dwarfs-t's test data).
 //!
 //! Covers the whole reader surface: open from file / memory / file region,
 //! stat, pread, directory listing, image info JSON, and the error paths.
+//!
+//! Requires the native library: without `vendored` every operation fails
+//! with ENOTSUP, so the whole file is compiled out in skeleton builds.
+#![cfg(feature = "vendored")]
 
 use std::path::{Path, PathBuf};
 
