@@ -30,12 +30,19 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 /// dwarfs libraries, in dependent-first static link order.
-const DWARFS_LIBS: &[&str] = &[
-    "dwarfs_c",
-    "dwarfs_reader",
-    "dwarfs_decompressor",
-    "dwarfs_common",
-    "dwarfs_metadata_legacy",
+///
+/// `true` = required (link always); `false` = emit only when the archive
+/// exists (drift tolerance for older vendored refs: the writer API of
+/// libdwarfs_c links dwarfs_writer, which in turn needs dwarfs_compressor —
+/// refs predating the writer binding ship neither).
+const DWARFS_LIBS: &[(&str, bool)] = &[
+    ("dwarfs_c", true),
+    ("dwarfs_writer", false),
+    ("dwarfs_reader", true),
+    ("dwarfs_decompressor", true),
+    ("dwarfs_compressor", false),
+    ("dwarfs_common", true),
+    ("dwarfs_metadata_legacy", true),
 ];
 
 /// vcpkg dependency libraries, in dependent-first static link order.
@@ -175,7 +182,8 @@ fn main() {
                 "-DVCPKG_OVERLAY_TRIPLETS={}",
                 dwarfs_t.join("vcpkg_triplets").display()
             ))
-            // Reader binding only: no tools, no tests, no FUSE driver.
+            // The dwarfs_c binding (reader + writer): no tools, no tests,
+            // no FUSE driver.
             .arg("-DWITH_TESTS=OFF")
             .arg("-DWITH_TOOLS=OFF")
             .arg("-DWITH_BENCHMARKS=OFF")
@@ -212,8 +220,10 @@ fn main() {
     println!("cargo:rustc-link-search=native={}", build_dir.display());
     println!("cargo:rustc-link-search=native={}", vcpkg_lib.display());
 
-    for lib in DWARFS_LIBS {
-        println!("cargo:rustc-link-lib=static={lib}");
+    for (lib, required) in DWARFS_LIBS {
+        if *required || lib_exists(&build_dir, lib) {
+            println!("cargo:rustc-link-lib=static={lib}");
+        }
     }
     for lib in VCPKG_LIBS {
         if lib_exists(&vcpkg_lib, lib) {

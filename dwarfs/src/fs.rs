@@ -9,16 +9,11 @@ use dwarfs_t_sys::{dwarfs_c_filesystem, dwarfs_c_stat, DWARFS_C_OFFSET_AUTO};
 use crate::dir::ReadDir;
 use crate::error::DwarfsError;
 use crate::metadata::Metadata;
+use crate::path_cstring;
 
 /// Pass as `offset` to [`Filesystem::open_region`] to auto-detect the image
 /// start inside the container file.
 pub const OFFSET_AUTO: i64 = DWARFS_C_OFFSET_AUTO;
-
-/// Convert a filesystem path to a `CString` for the C ABI.
-fn path_cstring(path: &Path) -> Result<CString, DwarfsError> {
-    CString::new(path.as_os_str().as_encoded_bytes())
-        .map_err(|_| DwarfsError::invalid_input("path contains an interior NUL byte"))
-}
 
 /// Convert an in-image lookup path to a `CString` for the C ABI.
 fn lookup_cstring(path: &str) -> Result<CString, DwarfsError> {
@@ -69,8 +64,8 @@ impl Filesystem {
     /// Open a DwarFS image from a file.
     ///
     /// ```no_run
-    /// let fs = dwarfs::Filesystem::open("image.dwarfs")?;
-    /// # Ok::<(), dwarfs::DwarfsError>(())
+    /// let fs = dwarfs_t::Filesystem::open("image.dwarfs")?;
+    /// # Ok::<(), dwarfs_t::DwarfsError>(())
     /// ```
     ///
     /// # Errors

@@ -11,11 +11,13 @@
 //! - read file contents at an offset ([`Filesystem::pread`])
 //! - iterate directories ([`Filesystem::read_dir`])
 //! - query image-level metadata as JSON ([`Filesystem::image_info_json`])
+//! - create images fully in-process ([`Writer`]) — no `mkdwarfs`
+//!   subprocess, no shell, no PATH dependency
 //!
 //! ```no_run
-//! use dwarfs::{Filesystem, FileType};
+//! use dwarfs_t::{Filesystem, FileType};
 //!
-//! # fn main() -> Result<(), dwarfs::DwarfsError> {
+//! # fn main() -> Result<(), dwarfs_t::DwarfsError> {
 //! let fs = Filesystem::open("image.dwarfs")?;
 //!
 //! let meta = fs.stat("format.sh")?;
@@ -51,8 +53,16 @@ mod dir;
 mod error;
 mod fs;
 mod metadata;
+mod writer;
 
 pub use dir::{DirEntry, ReadDir};
 pub use error::{DwarfsError, ErrorKind};
 pub use fs::{Filesystem, OFFSET_AUTO};
 pub use metadata::{FileType, Metadata};
+pub use writer::{Compression, Writer, WriterOptions};
+
+/// Convert a filesystem path to a `CString` for the C ABI.
+pub(crate) fn path_cstring(path: &std::path::Path) -> Result<std::ffi::CString, DwarfsError> {
+    std::ffi::CString::new(path.as_os_str().as_encoded_bytes())
+        .map_err(|_| DwarfsError::invalid_input("path contains an interior NUL byte"))
+}

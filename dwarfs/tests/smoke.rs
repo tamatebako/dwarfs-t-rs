@@ -6,7 +6,7 @@
 
 use std::path::{Path, PathBuf};
 
-use dwarfs::{DwarfsError, ErrorKind, FileType, Filesystem, OFFSET_AUTO};
+use dwarfs_t::{DwarfsError, ErrorKind, FileType, Filesystem, OFFSET_AUTO};
 
 fn fixture() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))

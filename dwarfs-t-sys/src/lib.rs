@@ -1,14 +1,15 @@
-//! Raw FFI bindings to `libdwarfs_c`, the stable C ABI of the DwarFS reader.
+//! Raw FFI bindings to `libdwarfs_c`, the stable C ABI of DwarFS.
 //!
 //! These bindings mirror `dwarfs_c.h` from
 //! [dwarfs-t](https://github.com/tamatebako/dwarfs-t) exactly. They are
-//! **hand-written on purpose**: the C surface is small (16 functions, two
-//! POD structs, one enum) and is a deliberately frozen ABI, so pulling in
-//! `bindgen` (and its libclang requirement) would cost consumers more than
-//! it buys. Correctness of the Rust-side declarations against the C header
-//! is enforced at build time by `abi_check.c`, which contains
-//! `_Static_assert`s over every struct offset, struct size, enum value and
-//! constant used below; a mismatch fails the build.
+//! **hand-written on purpose**: the C surface is small (16 reader + 6
+//! writer functions, three POD structs, two enums) and is a deliberately
+//! frozen ABI, so pulling in `bindgen` (and its libclang requirement)
+//! would cost consumers more than it buys. Correctness of the Rust-side
+//! declarations against the C header is enforced at build time by
+//! `abi_check.c`, which contains `_Static_assert`s over every struct
+//! offset, struct size, enum value and constant used below; a mismatch
+//! fails the build.
 //!
 //! Everything in this crate is `unsafe` to call. You almost certainly want
 //! the safe [`dwarfs`](https://docs.rs/dwarfs) wrapper instead.
@@ -49,6 +50,46 @@ pub const DWARFS_C_FILE_OTHER: c_int = 4;
 
 /// Pass as offset to [`dwarfs_c_open_region`] to auto-detect the image start.
 pub const DWARFS_C_OFFSET_AUTO: i64 = -1;
+
+/// Opaque writer handle (`struct dwarfs_c_writer`).
+///
+/// Owned by the caller; release with [`dwarfs_c_writer_free`]. Not
+/// thread-safe.
+pub enum dwarfs_c_writer {}
+
+/// `dwarfs_c_compression`: store blocks uncompressed ("null").
+pub const DWARFS_C_COMPRESSION_NONE: c_int = 0;
+/// `dwarfs_c_compression`: Zstandard (mkdwarfs default).
+pub const DWARFS_C_COMPRESSION_ZSTD: c_int = 1;
+/// `dwarfs_c_compression`: LZMA.
+pub const DWARFS_C_COMPRESSION_LZMA: c_int = 2;
+/// `dwarfs_c_compression`: Brotli.
+pub const DWARFS_C_COMPRESSION_BROTLI: c_int = 3;
+
+/// Current version of the [`dwarfs_c_writer_options`] layout.
+pub const DWARFS_C_WRITER_OPTIONS_VERSION: u32 = 1;
+
+/// Writer options (`struct dwarfs_c_writer_options`).
+///
+/// Always obtain defaults via [`dwarfs_c_writer_options_init`]
+/// (struct_version-stamped); layout is pinned by `_Static_assert`s in
+/// `abi_check.c`.
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct dwarfs_c_writer_options {
+    /// `DWARFS_C_WRITER_OPTIONS_VERSION`.
+    pub struct_version: u32,
+    /// One of the `DWARFS_C_COMPRESSION_*` constants.
+    pub compression: i32,
+    /// Algorithm-native level; -1 = the mkdwarfs default per algorithm.
+    pub compression_level: i32,
+    /// log2 of the block size (10..30); 0 = mkdwarfs default (24).
+    pub block_size_bits: u32,
+    /// 0 = off (mkdwarfs default); 1 = the "pcmaudio" categorizer.
+    pub enable_categorizer: i32,
+    /// Worker threads for scanning and compression; 0 = one per CPU.
+    pub num_workers: u32,
+}
 
 /// Stat-equivalent information for a filesystem entry (`struct dwarfs_c_stat`).
 ///
@@ -156,4 +197,39 @@ extern "C" {
 
     /// Free a pointer returned by this library.
     pub fn dwarfs_c_free(ptr: *mut c_void);
+
+    /// Initialize a writer options struct to the mkdwarfs defaults profile
+    /// and stamp its struct_version. NULL opts are ignored.
+    pub fn dwarfs_c_writer_options_init(opts: *mut dwarfs_c_writer_options);
+
+    /// Create a writer. NULL on error (EINVAL for a bad struct_version or
+    /// out-of-range option values). NULL `opts` means "all defaults".
+    pub fn dwarfs_c_writer_create(opts: *const dwarfs_c_writer_options) -> *mut dwarfs_c_writer;
+
+    /// Add a whole directory tree to the image (the mkdwarfs -i equivalent):
+    /// the directory's content lands at the image root. `image_prefix` must
+    /// be NULL, "" or "/". 0 on success, -1 on error (EINVAL/ENOENT/ENOTDIR/
+    /// EALREADY).
+    pub fn dwarfs_c_writer_add_tree(
+        w: *mut dwarfs_c_writer,
+        host_path: *const c_char,
+        image_prefix: *const c_char,
+    ) -> c_int;
+
+    /// Add a single file at the image root; `image_path` must equal
+    /// basename(host_path) and all files must share one directory.
+    /// 0 on success, -1 on error (EINVAL/ENOENT/EALREADY).
+    pub fn dwarfs_c_writer_add_file(
+        w: *mut dwarfs_c_writer,
+        host_path: *const c_char,
+        image_path: *const c_char,
+    ) -> c_int;
+
+    /// Write the image to `out_path` (must not exist; the writer never
+    /// overwrites). This is where all scanning and compression happens.
+    /// 0 on success, -1 on error (EINVAL/EEXIST/EIO).
+    pub fn dwarfs_c_writer_write(w: *mut dwarfs_c_writer, out_path: *const c_char) -> c_int;
+
+    /// Release a writer handle. Safe to call with NULL.
+    pub fn dwarfs_c_writer_free(w: *mut dwarfs_c_writer);
 }
