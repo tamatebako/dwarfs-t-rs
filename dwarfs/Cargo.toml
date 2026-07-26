@@ -1,16 +1,33 @@
 [package]
 name = "dwarfs-t"
-description = "Safe Rust bindings to the DwarFS read-only filesystem reader (via libdwarfs_c)"
+description = "Safe Rust bindings to dwarfs-t (DwarFS): read DwarFS images and create them in-process via the stable libdwarfs_c ABI"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 homepage.workspace = true
-keywords = ["dwarfs", "filesystem", "archive", "read-only", "compression"]
-categories = ["filesystem", "api-bindings"]
+keywords = ["dwarfs", "filesystem", "archive", "compression", "ffi"]
+categories = ["filesystem", "api-bindings", "compression"]
 readme = "../README.md"
 
+[features]
+# `vendored` (default): link the native libdwarfs_c built from dwarfs-t
+# sources by dwarfs-t-sys (CMake/vcpkg; see the repository README).
+#
+# With default features OFF this crate is a pure-cargo skeleton: it compiles
+# and links without any native toolchain, and every operation fails with
+# ENOTSUP ([`ErrorKind::NotSupported`]). Useful for consumers that gate the
+# DwarFS backend behind their own optional feature.
+default = ["vendored"]
+vendored = ["dwarfs-t-sys/vendored"]
+
 [dependencies]
-dwarfs-t-sys = { version = "0.1.0", path = "../dwarfs-t-sys" }
+dwarfs-t-sys = { version = "0.1.0", path = "../dwarfs-t-sys", default-features = false }
 libc = "0.2"
+
+[package.metadata.docs.rs]
+# docs.rs cannot run CMake/vcpkg; dwarfs-t-sys' build script skips the
+# native build under the DOCS_RS env var, so the default `vendored` feature
+# stays enabled and the documented API is the full one.
+all-features = true

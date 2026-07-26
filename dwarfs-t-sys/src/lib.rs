@@ -12,7 +12,7 @@
 //! fails the build.
 //!
 //! Everything in this crate is `unsafe` to call. You almost certainly want
-//! the safe [`dwarfs`](https://docs.rs/dwarfs) wrapper instead.
+//! the safe [`dwarfs-t`](https://docs.rs/dwarfs-t) wrapper instead.
 //!
 //! # Linking
 //!
@@ -20,7 +20,20 @@
 //! and its entire static dependency closure from the vendored `dwarfs-t`
 //! git submodule (CMake + vcpkg). See the repository README for the
 //! environment knobs (`DWARFS_RS_VCPKG_ROOT`, `DWARFS_RS_VCPKG_TRIPLET`,
-//! `DWARFS_RS_DWARFS_T_SOURCE`, ...).
+//! `DWARFS_RS_DWARFS_T_SOURCE`, ...). The crates.io package does not bundle
+//! the dwarfs-t sources, so there `DWARFS_RS_DWARFS_T_SOURCE` is required.
+//!
+//! # Skeleton mode (`--no-default-features`)
+//!
+//! With `vendored` disabled, nothing native is built or linked and every
+//! ABI entry point below is a Rust stub with the same signature: calls that
+//! would fail report `ENOTSUP` through the thread-local error channel
+//! ([`dwarfs_c_errno`]/[`dwarfs_c_error_message`]) and return the failure
+//! value (NULL / -1); the `void` functions are no-ops. This lets dependent
+//! crates compile and link without any native toolchain, surfacing
+//! "operation not supported" at runtime instead. On docs.rs the native
+//! build is skipped as well (`DOCS_RS` env), but the declarations stay
+//! feature-complete because rustdoc never links.
 
 #![allow(non_camel_case_types)]
 #![allow(clippy::missing_safety_doc)]
@@ -126,6 +139,7 @@ pub struct dwarfs_c_dirent {
     pub r#type: i32,
 }
 
+#[cfg(feature = "vendored")]
 extern "C" {
     /// Thread-local error code of the last failed call on this thread
     /// (0 if the last call succeeded). Values are `errno.h` codes.
@@ -233,3 +247,181 @@ extern "C" {
     /// Release a writer handle. Safe to call with NULL.
     pub fn dwarfs_c_writer_free(w: *mut dwarfs_c_writer);
 }
+
+// ---------------------------------------------------------------------------
+// Skeleton mode (`--no-default-features`)
+//
+// No native library is built or linked (build.rs returns early), so the
+// whole ABI surface is provided as Rust stubs with the exact same names and
+// signatures. Every operation that can fail sets the thread-local error
+// channel to ENOTSUP (with a fixed explanatory message) and returns the
+// failure value of the real function (NULL / -1); the `void` functions are
+// no-ops. The stubs are plain Rust functions — they introduce no foreign
+// symbols, so they can never collide with a real libdwarfs_c linked by
+// someone else.
+// ---------------------------------------------------------------------------
+#[cfg(not(feature = "vendored"))]
+mod skeleton {
+    use super::*;
+    use core::cell::Cell;
+
+    thread_local! {
+        /// Thread-local errno channel, mirroring the real ABI's semantics.
+        static LAST_ERRNO: Cell<c_int> = const { Cell::new(0) };
+    }
+
+    /// The one message every skeleton failure reports.
+    static SKELETON_MSG: &[u8] = b"dwarfs-t-sys skeleton build: the `vendored` feature is disabled, no native library is linked\0";
+
+    /// Version string reported by [`dwarfs_c_version_string`].
+    static SKELETON_VERSION: &[u8] = b"0.0.0-skeleton\0";
+
+    /// Record ENOTSUP in the thread-local channel and return it.
+    fn fail_not_supported() -> c_int {
+        LAST_ERRNO.with(|e| e.set(libc::ENOTSUP));
+        libc::ENOTSUP
+    }
+
+    fn msg_ptr() -> *const c_char {
+        SKELETON_MSG.as_ptr().cast()
+    }
+
+    pub unsafe fn dwarfs_c_errno() -> c_int {
+        LAST_ERRNO.with(Cell::get)
+    }
+
+    pub unsafe fn dwarfs_c_error_message() -> *const c_char {
+        msg_ptr()
+    }
+
+    pub unsafe fn dwarfs_c_strerror(_err: c_int) -> *const c_char {
+        msg_ptr()
+    }
+
+    pub unsafe fn dwarfs_c_version() -> c_int {
+        0
+    }
+
+    pub unsafe fn dwarfs_c_version_string() -> *const c_char {
+        SKELETON_VERSION.as_ptr().cast()
+    }
+
+    pub unsafe fn dwarfs_c_open(_path: *const c_char) -> *mut dwarfs_c_filesystem {
+        fail_not_supported();
+        core::ptr::null_mut()
+    }
+
+    pub unsafe fn dwarfs_c_open_region(
+        _path: *const c_char,
+        _offset: i64,
+        _length: i64,
+    ) -> *mut dwarfs_c_filesystem {
+        fail_not_supported();
+        core::ptr::null_mut()
+    }
+
+    pub unsafe fn dwarfs_c_open_memory(
+        _data: *const c_void,
+        _size: usize,
+    ) -> *mut dwarfs_c_filesystem {
+        fail_not_supported();
+        core::ptr::null_mut()
+    }
+
+    pub unsafe fn dwarfs_c_close(_fs: *mut dwarfs_c_filesystem) {}
+
+    pub unsafe fn dwarfs_c_stat(
+        _fs: *mut dwarfs_c_filesystem,
+        _path: *const c_char,
+        _st: *mut dwarfs_c_stat,
+    ) -> c_int {
+        fail_not_supported();
+        -1
+    }
+
+    pub unsafe fn dwarfs_c_pread(
+        _fs: *mut dwarfs_c_filesystem,
+        _path: *const c_char,
+        _buf: *mut c_void,
+        _count: usize,
+        _offset: i64,
+    ) -> i64 {
+        fail_not_supported();
+        -1
+    }
+
+    pub unsafe fn dwarfs_c_opendir(
+        _fs: *mut dwarfs_c_filesystem,
+        _path: *const c_char,
+    ) -> *mut dwarfs_c_dir {
+        fail_not_supported();
+        core::ptr::null_mut()
+    }
+
+    pub unsafe fn dwarfs_c_readdir(_dir: *mut dwarfs_c_dir, _out: *mut dwarfs_c_dirent) -> c_int {
+        fail_not_supported();
+        -1
+    }
+
+    pub unsafe fn dwarfs_c_closedir(_dir: *mut dwarfs_c_dir) {}
+
+    pub unsafe fn dwarfs_c_image_info_json(_fs: *mut dwarfs_c_filesystem) -> *mut c_char {
+        fail_not_supported();
+        core::ptr::null_mut()
+    }
+
+    pub unsafe fn dwarfs_c_free(_ptr: *mut c_void) {}
+
+    /// Pure data initialization — implemented for real, exactly like the
+    /// native version (mkdwarfs defaults profile, version-stamped).
+    pub unsafe fn dwarfs_c_writer_options_init(opts: *mut dwarfs_c_writer_options) {
+        if let Some(opts) = opts.as_mut() {
+            *opts = dwarfs_c_writer_options {
+                struct_version: DWARFS_C_WRITER_OPTIONS_VERSION,
+                compression: DWARFS_C_COMPRESSION_ZSTD,
+                compression_level: -1,
+                block_size_bits: 0,
+                enable_categorizer: 0,
+                num_workers: 0,
+            };
+        }
+    }
+
+    pub unsafe fn dwarfs_c_writer_create(
+        _opts: *const dwarfs_c_writer_options,
+    ) -> *mut dwarfs_c_writer {
+        fail_not_supported();
+        core::ptr::null_mut()
+    }
+
+    pub unsafe fn dwarfs_c_writer_add_tree(
+        _w: *mut dwarfs_c_writer,
+        _host_path: *const c_char,
+        _image_prefix: *const c_char,
+    ) -> c_int {
+        fail_not_supported();
+        -1
+    }
+
+    pub unsafe fn dwarfs_c_writer_add_file(
+        _w: *mut dwarfs_c_writer,
+        _host_path: *const c_char,
+        _image_path: *const c_char,
+    ) -> c_int {
+        fail_not_supported();
+        -1
+    }
+
+    pub unsafe fn dwarfs_c_writer_write(
+        _w: *mut dwarfs_c_writer,
+        _out_path: *const c_char,
+    ) -> c_int {
+        fail_not_supported();
+        -1
+    }
+
+    pub unsafe fn dwarfs_c_writer_free(_w: *mut dwarfs_c_writer) {}
+}
+
+#[cfg(not(feature = "vendored"))]
+pub use skeleton::*;

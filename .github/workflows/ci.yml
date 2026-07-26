@@ -11,6 +11,8 @@ env:
   # baseline resolution works (mirrors dwarfs-t's own CI).
   VCPKG_COMMIT: f14401ca0f2754347c3864da7488a9b955b4e47a
 
+# All actions are pinned by commit SHA (the tag each SHA corresponds to is
+# noted in the comment); update both together.
 jobs:
   test:
     name: test (${{ matrix.os }})
@@ -20,12 +22,12 @@ jobs:
       matrix:
         os: [ubuntu-24.04, macos-14]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           submodules: recursive
 
       - name: Install toolchain (rustup)
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
 
       - name: Install native build tools (ubuntu)
         if: runner.os == 'Linux'
@@ -41,13 +43,13 @@ jobs:
         run: brew install ninja autoconf automake autoconf-archive libtool
 
       - name: Set up vcpkg
-        uses: lukka/run-vcpkg@v11
+        uses: lukka/run-vcpkg@b1a0dd252f06b9e25b3c022a9a03bd7a427fb6a2 # v11.6
         with:
           vcpkgGitCommitId: ${{ env.VCPKG_COMMIT }}
           vcpkgDirectory: ${{ github.workspace }}/.vcpkg-root
 
       - name: Cache vcpkg package archives
-        uses: actions/cache@v4
+        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
         with:
           path: |
             ~/.cache/vcpkg
@@ -70,12 +72,46 @@ jobs:
           rustup component add clippy
           cargo clippy --workspace --all-targets -- -D warnings
 
+  # The pure-cargo skeleton (--no-default-features): no vcpkg, no CMake, no
+  # submodule — consumers must always be able to build (and test the ENOTSUP
+  # behavior of) the crate without the native toolchain. Also simulates the
+  # docs.rs build (DOCS_RS skips the native build with default features on).
+  skeleton:
+    name: skeleton + docs.rs (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-14]
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        # No submodules: the skeleton must not need the dwarfs-t sources.
+
+      - name: Install toolchain (rustup)
+        uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
+        with:
+          components: clippy
+
+      - name: cargo check (skeleton)
+        run: cargo check --workspace --no-default-features
+
+      - name: cargo test (skeleton)
+        run: cargo test --workspace --no-default-features
+
+      - name: clippy (skeleton)
+        run: cargo clippy --workspace --all-targets --no-default-features -- -D warnings
+
+      - name: cargo doc (docs.rs simulation)
+        env:
+          DOCS_RS: "1"
+        run: cargo doc --workspace --no-deps
+
   fmt:
     name: fmt
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
         with:
           components: rustfmt
       - run: cargo fmt --all -- --check

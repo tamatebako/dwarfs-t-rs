@@ -1,16 +1,26 @@
-//! Build script for dwarfs-sys.
+//! Build script for dwarfs-t-sys.
 //!
-//! `vendored` mode (the only mode in v1): compiles `libdwarfs_c` and its
-//! whole static dependency closure from the vendored `dwarfs-t` git
+//! `vendored` mode (the only native mode in v1): compiles `libdwarfs_c` and
+//! its whole static dependency closure from the vendored `dwarfs-t` git
 //! submodule using dwarfs-t's own CMake/vcpkg build (overlay ports and
 //! triplets included), then links the curated closure in dependent-first
 //! order.
+//!
+//! The native build is skipped in two cases:
+//!
+//! - **docs.rs** (`DOCS_RS` env var set): docs.rs cannot run CMake/vcpkg,
+//!   and rustdoc never links the native library, so there is nothing to do.
+//! - **skeleton mode** (the `vendored` feature disabled, i.e.
+//!   `--no-default-features`): nothing native is built or linked; the crate
+//!   compiles Rust-side stubs that fail every ABI call with `ENOTSUP`, so
+//!   dependent crates always build — and link — without a native toolchain.
 //!
 //! Environment knobs:
 //!
 //! - `DWARFS_RS_DWARFS_T_SOURCE` — path to a dwarfs-t checkout.
 //!   Default: the `dwarfs-t` submodule next to this crate's manifest
-//!   (run `git submodule update --init` after cloning).
+//!   (run `git submodule update --init` after cloning). REQUIRED for the
+//!   crates.io package, which does not bundle the dwarfs-t sources.
 //! - `DWARFS_RS_VCPKG_ROOT` (or `VCPKG_ROOT`) — vcpkg installation root
 //!   (must contain `scripts/buildsystems/vcpkg.cmake`). REQUIRED.
 //! - `DWARFS_RS_VCPKG_TRIPLET` — vcpkg triplet; default is derived from the
@@ -88,6 +98,27 @@ fn main() {
         println!("cargo:rerun-if-env-changed={var}");
     }
 
+    // docs.rs cannot run CMake/vcpkg — and rustdoc never links the native
+    // library, so there is nothing to build.
+    if env::var_os("DOCS_RS").is_some() {
+        println!(
+            "cargo:warning=DOCS_RS detected: skipping the libdwarfs_c native build \
+             (documentation-only build)"
+        );
+        return;
+    }
+
+    // Skeleton mode (`--no-default-features`): no native library is built or
+    // linked; src/lib.rs compiles ENOTSUP stubs for every ABI entry point.
+    if env::var_os("CARGO_FEATURE_VENDORED").is_none() {
+        println!(
+            "cargo:warning=the `vendored` feature is disabled: building the ENOTSUP \
+             skeleton — no native library is linked and every dwarfs_c_* call fails \
+             with ENOTSUP"
+        );
+        return;
+    }
+
     // ---------------------------------------------------------------
     // Locate the dwarfs-t sources (vendored submodule by default)
     // ---------------------------------------------------------------
@@ -114,8 +145,10 @@ fn main() {
     if !header.exists() {
         panic!(
             "dwarfs_c.h not found at {}.\n\
-             The dwarfs-t submodule is missing — run `git submodule update --init`,\n\
-             or point DWARFS_RS_DWARFS_T_SOURCE at a dwarfs-t checkout.",
+             In a git checkout: run `git submodule update --init`.\n\
+             From crates.io: the dwarfs-t sources are not bundled — point\n\
+             DWARFS_RS_DWARFS_T_SOURCE at a dwarfs-t checkout, or build with\n\
+             --no-default-features for the pure-cargo ENOTSUP skeleton.",
             header.display()
         );
     }

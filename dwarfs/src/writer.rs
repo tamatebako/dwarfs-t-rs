@@ -171,7 +171,7 @@ impl Writer {
     ///   is not a directory
     /// - [`ErrorKind::InvalidInput`](crate::ErrorKind::InvalidInput) for any
     ///   other `image_prefix`
-    /// - `EALREADY` (via [`ErrorKind::Other`]) if a source was already added
+    /// - `EALREADY` (via [`crate::ErrorKind::Other`]) if a source was already added
     pub fn add_tree(
         &mut self,
         host_path: impl AsRef<Path>,
@@ -204,7 +204,7 @@ impl Writer {
     ///   does not exist
     /// - [`ErrorKind::InvalidInput`](crate::ErrorKind::InvalidInput) for a
     ///   rename or a second directory
-    /// - `EALREADY` (via [`ErrorKind::Other`]) if a tree source was added
+    /// - `EALREADY` (via [`crate::ErrorKind::Other`]) if a tree source was added
     pub fn add_file(
         &mut self,
         host_path: impl AsRef<Path>,
@@ -235,7 +235,7 @@ impl Writer {
     /// # Errors
     /// - [`ErrorKind::InvalidInput`](crate::ErrorKind::InvalidInput) if no
     ///   source was added
-    /// - `EEXIST` (via [`ErrorKind::Other`]) if `out_path` exists
+    /// - `EEXIST` (via [`crate::ErrorKind::Other`]) if `out_path` exists
     /// - [`ErrorKind::Io`](crate::ErrorKind::Io) on scan/compress/write
     ///   failure (the message carries details)
     pub fn write(self, out_path: impl AsRef<Path>) -> Result<(), DwarfsError> {

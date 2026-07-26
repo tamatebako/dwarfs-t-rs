@@ -2,7 +2,7 @@
 //! a fast high-compression read-only file system.
 //!
 //! This crate wraps the stable C ABI (`libdwarfs_c`) of the DwarFS reader
-//! via the [`dwarfs-t-sys`] FFI crate. It exposes a small, idiomatic,
+//! via the `dwarfs-t-sys` FFI crate. It exposes a small, idiomatic,
 //! read-only API:
 //!
 //! - open an image from a file, from memory, or from a file region
@@ -34,6 +34,21 @@
 //! # Ok(())
 //! # }
 //! ```
+//!
+//! # Feature flags
+//!
+//! - `vendored` *(default)* — build and statically link the native
+//!   `libdwarfs_c` (plus its dependency closure) from dwarfs-t sources via
+//!   CMake/vcpkg. In a git checkout the sources are the pinned `dwarfs-t`
+//!   submodule; when building the crates.io package, point
+//!   `DWARFS_RS_DWARFS_T_SOURCE` at a dwarfs-t checkout (the sources are
+//!   not bundled). Requires CMake, a C++20 compiler and vcpkg
+//!   (`DWARFS_RS_VCPKG_ROOT`/`VCPKG_ROOT`).
+//! - *no default features* — the pure-cargo **skeleton**: nothing native is
+//!   built or linked, so the crate always compiles; every operation then
+//!   fails at runtime with `ENOTSUP` ([`ErrorKind::NotSupported`]). This
+//!   exists for consumers that gate the DwarFS backend behind their own
+//!   optional feature and must build either way.
 //!
 //! # Errors
 //!

@@ -1,13 +1,19 @@
-# dwarfs-rs
+# dwarfs-t-rs
+
+[![crates.io](https://img.shields.io/crates/v/dwarfs-t.svg)](https://crates.io/crates/dwarfs-t)
+[![docs.rs](https://docs.rs/dwarfs-t/badge.svg)](https://docs.rs/dwarfs-t)
+[![CI](https://github.com/tamatebako/dwarfs-t-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/tamatebako/dwarfs-t-rs/actions/workflows/ci.yml)
 
 Rust bindings to [DwarFS](https://github.com/tamatebako/dwarfs-t) — a fast
-high-compression **read-only** file system — via its stable C ABI.
+high-compression **read-only** file system — via its stable C ABI
+(`libdwarfs_c`): mount and read images, and **create** them fully in-process
+(no `mkdwarfs` subprocess, no shell, no PATH dependency).
 
 This repository is **standalone from day one**: it is not tebako-specific,
 it is not part of any other project, and it tracks
-[dwarfs-t](https://github.com/tamatebako/dwarfs-t) releases. It is intended
-to be published to crates.io eventually; today it is consumed as a git or
-path dependency.
+[dwarfs-t](https://github.com/tamatebako/dwarfs-t) releases. It is published
+to crates.io as [`dwarfs-t`](https://crates.io/crates/dwarfs-t) and
+[`dwarfs-t-sys`](https://crates.io/crates/dwarfs-t-sys).
 
 ## Layers
 
@@ -15,17 +21,17 @@ path dependency.
 ┌─────────────────────────────────────────────────────────────┐
 │ consumers (your crate, tebako-rs, any Rust/FFI consumer)    │
 ├─────────────────────────────────────────────────────────────┤
-│ dwarfs        — safe, idiomatic Rust API (this repo)        │
+│ dwarfs-t      — safe, idiomatic Rust API (this repo)        │
 │                 Result-based errors, owned types, iterators │
 ├─────────────────────────────────────────────────────────────┤
-│ dwarfs-sys    — raw extern "C" declarations (this repo)     │
+│ dwarfs-t-sys  — raw extern "C" declarations (this repo)     │
 │                 + build.rs that compiles the native library │
 ├─────────────────────────────────────────────────────────────┤
 │ libdwarfs_c   — the STABLE C ABI (22 functions, dwarfs_c_*)  │
 │                 lives in dwarfs-t: include/dwarfs_c.h       │
 ├─────────────────────────────────────────────────────────────┤
-│ dwarfs-t      — the C++20 DwarFS reader (filesystem_v2 &    │
-│                 co.), statically absorbed inside the C ABI  │
+│ dwarfs-t      — the C++20 DwarFS reader/writer (filesystem_ │
+│                 v2 & co.), statically absorbed in the C ABI │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -43,12 +49,18 @@ change what Rust sees.
 ## Requirements
 
 - Rust (stable, 1.74+)
-- CMake, a C++20 compiler, and ninja (or make)
+- For the default `vendored` feature only: CMake, a C++20 compiler, and
+  ninja (or make)
 - **vcpkg** — the native dependency chain (flatbuffers, xxhash, zstd, lz4,
   liblzma, brotli, boost, fmt, openssl, ...) is built by dwarfs-t's own
   vcpkg manifest through its overlay ports.
 
+The no-default-features [skeleton](#feature-flags) needs none of the native
+toolchain.
+
 ## Building
+
+### From a git checkout
 
 ```console
 $ git submodule update --init            # vendored dwarfs-t (pinned ref)
@@ -60,13 +72,33 @@ The first build compiles the whole native dep chain (vcpkg) and then
 `libdwarfs_c` — expect tens of minutes on a cold vcpkg binary cache, a few
 minutes on a warm one. Later builds are incremental.
 
-### Environment knobs (dwarfs-sys build.rs)
+### From crates.io
+
+The crates.io packages do **not** bundle the dwarfs-t sources (the C++
+tree is far over the package size limit). With the default `vendored`
+feature you therefore need your own dwarfs-t checkout:
+
+```console
+$ export DWARFS_RS_DWARFS_T_SOURCE=/path/to/dwarfs-t
+$ export DWARFS_RS_VCPKG_ROOT=/path/to/vcpkg
+$ cargo build            # in your project, with dwarfs-t as a dependency
+```
+
+If you only need the crate to compile — e.g. your DwarFS support is behind
+an optional feature of your own — use the skeleton instead:
+
+```toml
+[dependencies]
+dwarfs-t = { version = "0.1", default-features = false }
+```
+
+### Environment knobs (dwarfs-t-sys build.rs)
 
 | variable | default | meaning |
 |---|---|---|
-| `DWARFS_RS_VCPKG_ROOT` (or `VCPKG_ROOT`) | — (required) | vcpkg installation root |
+| `DWARFS_RS_VCPKG_ROOT` (or `VCPKG_ROOT`) | — (required for `vendored`) | vcpkg installation root |
 | `DWARFS_RS_VCPKG_TRIPLET` | derived from the Rust target (e.g. `arm64-osx-static`, `x64-linux-static`) | vcpkg triplet to build against |
-| `DWARFS_RS_DWARFS_T_SOURCE` | the `dwarfs-t` submodule | path to a dwarfs-t checkout |
+| `DWARFS_RS_DWARFS_T_SOURCE` | the `dwarfs-t` submodule (git checkout only) | path to a dwarfs-t checkout |
 | `DWARFS_RS_CMAKE_BUILD_TYPE` | `Release` | CMake build type |
 | `DWARFS_RS_VERBOSE` | unset | set to stream CMake output |
 
@@ -74,15 +106,21 @@ minutes on a warm one. Later builds are incremental.
 
 | feature | default | meaning |
 |---|---|---|
-| `vendored` | ✔ | Build `libdwarfs_c` and its whole static dependency closure from the vendored dwarfs-t source (git submodule, pinned ref) via CMake/vcpkg. **The only mode in v1.** |
+| `vendored` | ✔ | Build `libdwarfs_c` and its whole static dependency closure from dwarfs-t sources (git submodule, pinned ref; or `DWARFS_RS_DWARFS_T_SOURCE` from crates.io) via CMake/vcpkg. **The only native mode in v1.** |
+| *(none)* | — | `--no-default-features` builds the pure-cargo **skeleton**: nothing native is built or linked, the crate always compiles, and every operation fails at runtime with `ENOTSUP` ([`ErrorKind::NotSupported`](https://docs.rs/dwarfs-t)). This lets consumers gate the DwarFS backend behind their own optional feature and build either way. |
 | `system` | — | (planned) Link a prebuilt `libdwarfs_c` (e.g. discovered via pkg-config) instead of building from source. |
+
+**docs.rs** cannot run CMake/vcpkg. The `dwarfs-t-sys` build script detects
+the `DOCS_RS` environment variable and skips the native build there
+(rustdoc never links it), so `cargo doc` and the published documentation
+always work.
 
 ## Usage
 
 ```rust,no_run
-use dwarfs::{Filesystem, FileType};
+use dwarfs_t::{Filesystem, FileType};
 
-fn main() -> Result<(), dwarfs::DwarfsError> {
+fn main() -> Result<(), dwarfs_t::DwarfsError> {
     let fs = Filesystem::open("image.dwarfs")?;
 
     let meta = fs.stat("format.sh")?;
@@ -154,6 +192,17 @@ throughput, never the layout.
 | Linux (x86_64, aarch64, gnu) | supported, tested in CI |
 | Windows (MSVC) | **not yet** — dwarfs-t's `*-windows-static` triplets use the static CRT (/MT), which mismatches Rust's default dynamic CRT (/MD); needs a dedicated triplet/CRT story |
 
+(The pure-cargo skeleton builds on any platform, including Windows — it
+contains no native code at all.)
+
+## Version policy
+
+Both crates version together (`0.x`) and **track dwarfs-t releases**: each
+release of this repo pins a specific dwarfs-t ref in the git submodule (the
+`DWARFS_RS_DWARFS_T_SOURCE` override accepts any compatible checkout). The
+C ABI itself is frozen; while the crates are at `0.x`, minor bumps may
+still change the safe Rust API.
+
 ## License
 
 - The **Rust sources** in this repository are licensed under
@@ -171,6 +220,15 @@ throughput, never the layout.
 
   DwarFS's bundled third-party libraries carry their own (permissive)
   licenses; see the dwarfs-t repository for the full list.
+
+  For context: this GPL-3.0 obligation is specific to the DwarFS backend.
+  Other image backends used alongside it in the wider tebako ecosystem
+  differ — the ZIP backend is a pure-Rust crate (MIT) and the SquashFS
+  backend links libsquashfs from squashfs-tools-ng (LGPL-3.0-or-later) —
+  so backend selection changes a consumer's license obligations. The
+  no-default-features skeleton of this crate links no native code at all
+  (it fails every operation with `ENOTSUP`), so a binary that only ships
+  the skeleton is not combined with GPL-3.0 code by this crate.
 
 ## Why dwarfs-t-rs (and not dwarfs-rs)
 
