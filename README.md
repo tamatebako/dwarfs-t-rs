@@ -21,7 +21,7 @@ path dependency.
 │ dwarfs-sys    — raw extern "C" declarations (this repo)     │
 │                 + build.rs that compiles the native library │
 ├─────────────────────────────────────────────────────────────┤
-│ libdwarfs_c   — the STABLE C ABI (16 functions, dwarfs_c_*) │
+│ libdwarfs_c   — the STABLE C ABI (22 functions, dwarfs_c_*)  │
 │                 lives in dwarfs-t: include/dwarfs_c.h       │
 ├─────────────────────────────────────────────────────────────┤
 │ dwarfs-t      — the C++20 DwarFS reader (filesystem_v2 &    │
@@ -37,8 +37,8 @@ change what Rust sees.
 
 | crate | purpose |
 |---|---|
-| [`dwarfs-t`](dwarfs/) | Safe wrapper: `Filesystem::open` / `open_memory` / `open_region`, `stat`, `pread`, `read_dir` iterator, `image_info_json`, `DwarfsError` mapping the errno channel. |
-| [`dwarfs-t-sys`](dwarfs-sys/) | Hand-written `extern "C"` declarations for the 16-function C ABI (hand-written because the surface is small and frozen — no bindgen/libclang needed; an `abi_check.c` with `_Static_assert`s pins the layout at build time) plus the vendored-source build. |
+| [`dwarfs-t`](dwarfs/) | Safe wrapper: `Filesystem::open` / `open_memory` / `open_region`, `stat`, `pread`, `read_dir` iterator, `image_info_json`, `Writer` (in-process image creation), `DwarfsError` mapping the errno channel. |
+| [`dwarfs-t-sys`](dwarfs-t-sys/) | Hand-written `extern "C"` declarations for the 22-function C ABI (hand-written because the surface is small and frozen — no bindgen/libclang needed; an `abi_check.c` with `_Static_assert`s pins the layout at build time) plus the vendored-source build. |
 
 ## Requirements
 
@@ -105,6 +105,46 @@ fn main() -> Result<(), dwarfs::DwarfsError> {
 `Filesystem` is `Send + Sync`: concurrent `stat`/`pread`/`read_dir` calls
 on the same handle are safe (the underlying reader is thread-safe for
 reads, and each directory iterator is independent state).
+
+## Writing images (in-process)
+
+The same ABI also *creates* images — no `mkdwarfs` binary, no shell, no
+PATH dependency anywhere. Single-shot discipline: create a `Writer`, add
+content, `write()` (which consumes the writer); dropping always releases
+the native handle.
+
+```rust,no_run
+use dwarfs_t::{Compression, Filesystem, Writer, WriterOptions};
+
+fn main() -> Result<(), dwarfs_t::DwarfsError> {
+    // WriterOptions::default() is the mkdwarfs defaults profile (zstd
+    // blocks, 16 MiB block size, similarity ordering, categorizers off,
+    // one worker per CPU).
+    let mut w = Writer::new(WriterOptions::default())?;
+    w.add_tree("app/", "/")?;            // the mkdwarfs -i equivalent
+    w.write("app.dwarfs")?;              // consumes w; never overwrites
+
+    // ...and read it straight back through the same crate:
+    let fs = Filesystem::open("app.dwarfs")?;
+    assert!(fs.stat("hello.txt").is_ok());
+
+    // Custom compression (zstd/lzma/brotli/none + algo-native level):
+    let mut fast = Writer::with_compression(Compression::Zstd, Some(3))?;
+    fast.add_tree("app/", "/")?;
+    fast.write("app-fast.dwarfs")?;
+    Ok(())
+}
+```
+
+v1 source rules (enforced by the ABI, surfaced as `DwarfsError`): the
+writer is single-source — one `add_tree` XOR `add_file`s sharing one
+directory, placed at the image root by basename; arbitrary
+prefixes/renames are rejected with `EINVAL`. `write` never overwrites
+(`EEXIST`) and a writer cannot be written twice (`EALREADY`).
+
+**Determinism:** output bytes are *not* run-to-run deterministic (the
+image history records creation timestamps); `num_workers` affects only
+throughput, never the layout.
 
 ## Platform support
 
