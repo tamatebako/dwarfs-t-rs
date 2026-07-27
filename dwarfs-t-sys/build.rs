@@ -216,7 +216,17 @@ fn main() {
                 dwarfs_t.join("vcpkg_triplets").display()
             ))
             // The dwarfs_c binding (reader + writer): no tools, no tests,
-            // no FUSE driver.
+            // no FUSE driver. The driver is a dwarfs-t product-line tool and
+            // is never part of the binding surface, so it is always OFF here;
+            // with DWARFS_WITH_FUSE=OFF, dwarfs-t's need_fuse.cmake never
+            // probes for libfuse. dwarfs-t's vcpkg manifest mirrors this:
+            // libfuse sits behind the opt-in `fuse` manifest feature, which
+            // the default-feature install used here never enables (libfuse
+            // does not build on musl).
+            //
+            // TODO(fuse): if the tfs-fuse work ever needs the driver through
+            // this binding, add a `fuse` cargo feature that flips these two
+            // flags ON and passes -DVCPKG_MANIFEST_FEATURES=fuse.
             .arg("-DWITH_TESTS=OFF")
             .arg("-DWITH_TOOLS=OFF")
             .arg("-DWITH_BENCHMARKS=OFF")
