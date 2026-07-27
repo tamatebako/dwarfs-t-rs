@@ -106,6 +106,33 @@ jobs:
           DOCS_RS: "1"
         run: cargo doc --workspace --no-deps
 
+  # Windows skeleton leg: the pure-cargo ENOTSUP skeleton must build, test
+  # and lint for the MSVC target. A vendored (default-features) Windows leg
+  # is deliberately absent: the vendored build (x64-windows-static-md
+  # triplet, /MD) is wired in dwarfs-t-sys/build.rs but not yet proven on a
+  # Windows runner — see README "Windows and the CRT".
+  skeleton-windows:
+    name: skeleton (windows, msvc)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        # No submodules: the skeleton must not need the dwarfs-t sources.
+
+      - name: Install toolchain (rustup)
+        uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
+        with:
+          components: clippy
+          targets: x86_64-pc-windows-msvc
+
+      - name: cargo check (skeleton)
+        run: cargo check --workspace --no-default-features --target x86_64-pc-windows-msvc
+
+      - name: cargo test (skeleton)
+        run: cargo test --workspace --no-default-features --target x86_64-pc-windows-msvc
+
+      - name: clippy (skeleton)
+        run: cargo clippy --workspace --all-targets --no-default-features --target x86_64-pc-windows-msvc -- -D warnings
+
   fmt:
     name: fmt
     runs-on: ubuntu-24.04

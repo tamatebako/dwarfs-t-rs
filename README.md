@@ -97,7 +97,7 @@ dwarfs-t = { version = "0.1", default-features = false }
 | variable | default | meaning |
 |---|---|---|
 | `DWARFS_RS_VCPKG_ROOT` (or `VCPKG_ROOT`) | — (required for `vendored`) | vcpkg installation root |
-| `DWARFS_RS_VCPKG_TRIPLET` | derived from the Rust target (e.g. `arm64-osx-static`, `x64-linux-static`) | vcpkg triplet to build against |
+| `DWARFS_RS_VCPKG_TRIPLET` | derived from the Rust target (e.g. `arm64-osx-static`, `x64-linux-static`, `x64-windows-static-md`) | vcpkg triplet to build against |
 | `DWARFS_RS_DWARFS_T_SOURCE` | the `dwarfs-t` submodule (git checkout only) | path to a dwarfs-t checkout |
 | `DWARFS_RS_CMAKE_BUILD_TYPE` | `Release` | CMake build type |
 | `DWARFS_RS_VERBOSE` | unset | set to stream CMake output |
@@ -190,10 +190,37 @@ throughput, never the layout.
 |---|---|
 | macOS (arm64, x86_64) | supported, tested in CI |
 | Linux (x86_64, aarch64, gnu) | supported, tested in CI |
-| Windows (MSVC) | **not yet** — dwarfs-t's `*-windows-static` triplets use the static CRT (/MT), which mismatches Rust's default dynamic CRT (/MD); needs a dedicated triplet/CRT story |
+| Windows (MSVC) | skeleton tested in CI; vendored build wired (CRT strategy below) but **not yet CI-proven** |
+| Windows (gnullvm, ucrt64) | skeleton builds; vendored build wired via `x64-mingw-static`, likewise unproven |
 
 (The pure-cargo skeleton builds on any platform, including Windows — it
 contains no native code at all.)
+
+### Windows and the CRT (/MD vs /MT)
+
+Rust links the **dynamic CRT (/MD)** by default on `*-windows-msvc`, so the
+default vcpkg triplets are the `*-windows-static-md` variants (static
+libraries, dynamic CRT) — not `*-windows-static`, which is /MT and would
+mismatch at link time. The `-md` triplets are upstream vcpkg community
+triplets (no overlay file needed; dwarfs-t also ships matching
+`x64-windows-static-md` CMake presets).
+
+Forcing the static CRT on the Rust side (`RUSTFLAGS=-C
+target-feature=+crt-static`, /MT) against the default /MD triplet is refused
+by the build script with a named error; opting into /MT requires an explicit
+/MT triplet too (`DWARFS_RS_VCPKG_TRIPLET=x64-windows-static`, resp.
+`arm64-windows-static`). The build script warns on the remaining mismatched
+combinations.
+
+For `x86_64-pc-windows-gnullvm` (llvm-mingw, UCRT — the ucrt64-class target
+of the C++ line) the default triplet is `x64-mingw-static`, the triplet the
+C++ libtfs builds used for windows-ucrt64; CRT linkage there is dynamic
+against the UCRT, matching Rust's gnullvm targets. dwarfs-t's overlay already
+ships `x64-mingw-static.cmake`, so no new overlay triplet is needed.
+
+A vendored Windows CI leg is deliberately absent until the vendored build is
+proven on a Windows runner; the skeleton leg covers check/clippy/test for
+`x86_64-pc-windows-msvc`.
 
 ## Version policy
 
