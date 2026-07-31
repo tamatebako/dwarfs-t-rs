@@ -361,8 +361,8 @@ fn main() {
         // OpenSSL's CAPI engine → crypt32, sockets → ws2_32, and the
         // usual bcrypt/ole32/uuid/advapi32 tail).
         for lib in [
-            "stdc++", "gcc", "gcc_eh", "pthread",
-            "shell32", "psapi", "crypt32", "ws2_32", "bcrypt", "ole32", "uuid", "advapi32",
+            "stdc++", "gcc", "gcc_eh", "pthread", "shell32", "psapi", "crypt32", "ws2_32",
+            "bcrypt", "ole32", "uuid", "advapi32",
         ] {
             println!("cargo:rustc-link-lib={lib}");
         }
