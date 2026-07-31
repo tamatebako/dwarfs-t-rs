@@ -145,6 +145,12 @@ jobs:
   # itself (windows-latest runs the PE binaries natively). The CRT note
   # above (x64-windows-static-md, /MD) is the MSVC flavor — the ucrt64
   # flavor is this one.
+  #
+  # Environment: dwarfs-t's own green windows-gcc CI shape — Git-bash
+  # steps + the runner's built-in MinGW + get-cmake, NEVER an msys2
+  # shell: vcpkg's autotools ports (the libiconv/openssl family) die in
+  # `make install` when the port build is spawned from an msys2 shell
+  # (three consecutive factory legs lost to it).
   windows-gnu:
     name: vendored (windows, ucrt64)
     runs-on: windows-latest
@@ -160,16 +166,11 @@ jobs:
         with:
           targets: x86_64-pc-windows-gnu
 
-      - name: msys2 (ucrt64 toolchain)
-        uses: msys2/setup-msys2@v2
+      - name: Install CMake and Ninja
+        uses: lukka/get-cmake@latest
         with:
-          msystem: UCRT64
-          update: false
-          install: >-
-            git
-            mingw-w64-ucrt-x86_64-gcc
-            mingw-w64-ucrt-x86_64-cmake
-            mingw-w64-ucrt-x86_64-ninja
+          cmakeVersion: latest
+          ninjaVersion: latest
 
       - name: Set up vcpkg
         uses: lukka/run-vcpkg@b1a0dd252f06b9e25b3c022a9a03bd7a427fb6a2 # v11.6
@@ -186,22 +187,32 @@ jobs:
             vcpkg-archives-${{ runner.os }}-mingw-
 
       - name: cargo build (vendored, windows-gnu)
-        shell: msys2 {0}
+        shell: bash
         env:
           DWARFS_RS_VCPKG_ROOT: ${{ github.workspace }}/.vcpkg-root
           VCPKG_ROOT: ${{ github.workspace }}/.vcpkg-root
         run: |
-          export PATH="/c/Users/runneradmin/.cargo/bin:/ucrt64/bin:$PATH"
+          export PATH="/c/Users/runneradmin/.cargo/bin:$PATH"
           cargo build --workspace --target x86_64-pc-windows-gnu
 
       - name: cargo test (vendored, windows-gnu)
-        shell: msys2 {0}
+        shell: bash
         env:
           DWARFS_RS_VCPKG_ROOT: ${{ github.workspace }}/.vcpkg-root
           VCPKG_ROOT: ${{ github.workspace }}/.vcpkg-root
         run: |
-          export PATH="/c/Users/runneradmin/.cargo/bin:/ucrt64/bin:$PATH"
+          export PATH="/c/Users/runneradmin/.cargo/bin:$PATH"
           cargo test --workspace --target x86_64-pc-windows-gnu
+
+      - name: Dump vcpkg build logs on failure
+        if: failure()
+        shell: bash
+        run: |
+          for f in .vcpkg-root/buildtrees/*/build-x64-mingw-static-*-err.log .vcpkg-root/buildtrees/*/install-x64-mingw-static-*-err.log; do
+            [ -f "$f" ] || continue
+            echo "=== $f ==="
+            tail -40 "$f"
+          done
 
   fmt:
     name: fmt
