@@ -190,7 +190,7 @@ jobs:
           DWARFS_RS_VCPKG_ROOT: ${{ github.workspace }}/.vcpkg-root
           VCPKG_ROOT: ${{ github.workspace }}/.vcpkg-root
         run: |
-          export PATH="/ucrt64/bin:$PATH"
+          export PATH="/c/Users/runneradmin/.cargo/bin:/ucrt64/bin:$PATH"
           cargo build --workspace --target x86_64-pc-windows-gnu
 
       - name: cargo test (vendored, windows-gnu)
@@ -199,7 +199,7 @@ jobs:
           DWARFS_RS_VCPKG_ROOT: ${{ github.workspace }}/.vcpkg-root
           VCPKG_ROOT: ${{ github.workspace }}/.vcpkg-root
         run: |
-          export PATH="/ucrt64/bin:$PATH"
+          export PATH="/c/Users/runneradmin/.cargo/bin:/ucrt64/bin:$PATH"
           cargo test --workspace --target x86_64-pc-windows-gnu
 
   fmt:
