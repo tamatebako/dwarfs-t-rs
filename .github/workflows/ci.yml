@@ -161,7 +161,7 @@ jobs:
           targets: x86_64-pc-windows-gnu
 
       - name: msys2 (ucrt64 toolchain)
-        uses: msys2/setup-msys2@93989c8f7eb7e0ba404b66145c1e334e2b9e419f # v2.29.0
+        uses: msys2/setup-msys2@v2
         with:
           msystem: UCRT64
           update: false
