@@ -270,10 +270,7 @@ fn main() {
             .arg(format!("-DCMAKE_BUILD_TYPE={build_type}"))
             .arg(format!("-DCMAKE_TOOLCHAIN_FILE={}", toolchain.display()))
             .arg(format!("-DVCPKG_TARGET_TRIPLET={triplet}"))
-            .arg(format!(
-                "-DVCPKG_INSTALLED_DIR={}",
-                installed_dir.display()
-            ))
+            .arg(format!("-DVCPKG_INSTALLED_DIR={}", installed_dir.display()))
             .arg(format!(
                 "-DVCPKG_OVERLAY_PORTS={}",
                 dwarfs_t.join("vcpkg_ports").display()
