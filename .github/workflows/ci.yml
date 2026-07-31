@@ -196,33 +196,14 @@ jobs:
           restore-keys: |
             vcpkg-archives-${{ runner.os }}-mingw-
 
-      - name: cargo build (vendored, windows-gnu)
+      - name: cargo build + test (vendored, windows-gnu)
         shell: bash
         env:
           DWARFS_RS_VCPKG_ROOT: ${{ github.workspace }}/.vcpkg-root
           VCPKG_ROOT: ${{ github.workspace }}/.vcpkg-root
-        run: |
-          export PATH="/c/Users/runneradmin/.cargo/bin:$PATH"
-          cargo build --workspace --target x86_64-pc-windows-gnu
-
-      - name: cargo test (vendored, windows-gnu)
-        shell: bash
-        env:
-          DWARFS_RS_VCPKG_ROOT: ${{ github.workspace }}/.vcpkg-root
-          VCPKG_ROOT: ${{ github.workspace }}/.vcpkg-root
-        run: |
-          export PATH="/c/mingw64/bin:/c/Users/runneradmin/.cargo/bin:$PATH"
-          # serialize: a parallel harness hides which test crashes
-          cargo test --workspace --target x86_64-pc-windows-gnu --no-run
-          # STATUS_ENTRYPOINT_NOT_FOUND forensics: enumerate every DLL the
-          # test binaries import (the loader fails the process before main,
-          # so the failure's own stderr never names the missing entry).
-          for exe in target/x86_64-pc-windows-gnu/debug/deps/*.exe; do
-            echo "=== imports: $exe ==="
-            x86_64-w64-mingw32-objdump -p "$exe" | grep -E "DLL Name|^\s+[0-9a-f]+\s+\S+\s*$" | head -60 || true
-          done
-          # serialize: a parallel harness hides which test crashes
-          cargo test --workspace --target x86_64-pc-windows-gnu -- --test-threads=1
+        # Everything lives in ci/windows-gnu.sh (reviewed, shellcheck-able)
+        # — never inline run-blocks; they get string-edited and break silently.
+        run: bash ci/windows-gnu.sh
 
       - name: Dump vcpkg build logs on failure
         if: failure()
