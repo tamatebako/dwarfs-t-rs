@@ -121,18 +121,25 @@ fn image_info_json_reports_metadata() {
 
 #[test]
 fn open_memory_works() {
+    eprintln!("DBG open_memory: fixture_bytes");
     let bytes = fixture_bytes();
     let size = bytes.len();
+    eprintln!("DBG open_memory: open ({} bytes)", size);
     let fs = Filesystem::open_memory(&bytes).expect("open memory image");
+    eprintln!("DBG open_memory: opened");
     drop(bytes); // the safe API owns its copy
 
+    eprintln!("DBG open_memory: stat");
     let meta = fs.stat("format.sh").expect("stat via memory image");
+    eprintln!("DBG open_memory: stat ok size={}", meta.size);
     assert!(meta.size > 0);
 
     let mut buf = [0u8; 8];
+    eprintln!("DBG open_memory: pread");
     let n = fs
         .pread("format.sh", &mut buf, 0)
         .expect("pread via memory");
+    eprintln!("DBG open_memory: pread ok n={}", n);
     assert_eq!(n, 8);
 
     let disk_meta = Filesystem::open(fixture())
