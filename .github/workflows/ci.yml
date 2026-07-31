@@ -196,6 +196,12 @@ jobs:
           restore-keys: |
             vcpkg-archives-${{ runner.os }}-mingw-
 
+      - name: Cache the cargo target dir
+        uses: Swatinem/rust-cache@9d47c88ad934b5cefd8e0c376e7d226daca89ee3 # v2.7.5
+        with:
+          workspaces: |
+            .
+
       - name: cargo build + test (vendored, windows-gnu)
         shell: bash
         env:
