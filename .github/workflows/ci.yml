@@ -140,6 +140,68 @@ jobs:
       - name: clippy (skeleton)
         run: cargo clippy --workspace --all-targets --no-default-features --target x86_64-pc-windows-msvc -- -D warnings
 
+  # The vendored windows-gnu (ucrt64) leg: dwarfs-t cross-compiles with
+  # the mingw toolchain and the safe crate links and tests on the runner
+  # itself (windows-latest runs the PE binaries natively). The CRT note
+  # above (x64-windows-static-md, /MD) is the MSVC flavor — the ucrt64
+  # flavor is this one.
+  windows-gnu:
+    name: vendored (windows, ucrt64)
+    runs-on: windows-latest
+    env:
+      CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER: gcc.exe
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          submodules: recursive
+
+      - name: Install toolchain (rustup)
+        uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
+        with:
+          targets: x86_64-pc-windows-gnu
+
+      - name: msys2 (ucrt64 toolchain)
+        uses: msys2/setup-msys2@93989c8f7eb7e0ba404b66145c1e334e2b9e419f # v2.29.0
+        with:
+          msystem: UCRT64
+          update: false
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
+
+      - name: Set up vcpkg
+        uses: lukka/run-vcpkg@b1a0dd252f06b9e25b3c022a9a03bd7a427fb6a2 # v11.6
+        with:
+          vcpkgGitCommitId: ${{ env.VCPKG_COMMIT }}
+          vcpkgDirectory: ${{ github.workspace }}/.vcpkg-root
+
+      - name: Cache vcpkg package archives
+        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
+        with:
+          path: ~/AppData/Local/vcpkg/archives
+          key: vcpkg-archives-${{ runner.os }}-mingw-${{ hashFiles('dwarfs-t/vcpkg.json', 'dwarfs-t/vcpkg_ports/**', 'dwarfs-t/vcpkg_triplets/**') }}
+          restore-keys: |
+            vcpkg-archives-${{ runner.os }}-mingw-
+
+      - name: cargo build (vendored, windows-gnu)
+        shell: msys2 {0}
+        env:
+          DWARFS_RS_VCPKG_ROOT: ${{ github.workspace }}/.vcpkg-root
+          VCPKG_ROOT: ${{ github.workspace }}/.vcpkg-root
+        run: |
+          export PATH="/ucrt64/bin:$PATH"
+          cargo build --workspace --target x86_64-pc-windows-gnu
+
+      - name: cargo test (vendored, windows-gnu)
+        shell: msys2 {0}
+        env:
+          DWARFS_RS_VCPKG_ROOT: ${{ github.workspace }}/.vcpkg-root
+          VCPKG_ROOT: ${{ github.workspace }}/.vcpkg-root
+        run: |
+          export PATH="/ucrt64/bin:$PATH"
+          cargo test --workspace --target x86_64-pc-windows-gnu
+
   fmt:
     name: fmt
     runs-on: ubuntu-24.04
