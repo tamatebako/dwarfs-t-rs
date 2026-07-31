@@ -295,6 +295,21 @@ fn main() {
             };
             cmd.arg(format!("-DCMAKE_OSX_ARCHITECTURES={arch}"));
         }
+        // MinGW cross-compilation (windows-gnu/gnullvm): vcpkg's port
+        // builds pick the triplet's compiler, but a downstream CMAKE
+        // PROJECT like this one needs it explicitly — otherwise cmake
+        // quietly configures the HOST compiler and every dwarfs-t object
+        // lands as a host binary (proven: libdwarfs_c.a held arm64 Mach-O
+        // objects for an x86_64-pc-windows-gnu build).
+        if target == "x86_64-pc-windows-gnu" || target == "x86_64-pc-windows-gnullvm" {
+            cmd.arg("-DCMAKE_SYSTEM_NAME=Windows")
+                .arg("-DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc")
+                .arg("-DCMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++")
+                .arg("-DCMAKE_RC_COMPILER=x86_64-w64-mingw32-windres")
+                .arg("-DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER")
+                .arg("-DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY")
+                .arg("-DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY");
+        }
         run(cmd, verbose, "cmake configure");
     }
 
@@ -330,13 +345,25 @@ fn main() {
     // C++ runtime + platform extras. windows-msvc needs nothing explicit:
     // MSVC-compiled objects record their CRT/C++ runtime default libraries
     // (msvcprt, msvcrt, vcruntime) in .drectve sections, and the /MD vs /MT
-    // choice is enforced by the CRT probe above. windows-gnullvm is unwired
-    // here (C++ runtime linkage is part of the unproven vendored build).
+    // choice is enforced by the CRT probe above. windows-gnu links the
+    // MinGW C++ runtime chain (stdc++/gcc_eh/pthread are what the C++
+    // objects reference).
     if target.contains("apple") {
         println!("cargo:rustc-link-lib=c++");
     } else if target.contains("linux") || target.contains("android") {
         println!("cargo:rustc-link-lib=stdc++");
         for lib in ["pthread", "dl", "m"] {
+            println!("cargo:rustc-link-lib={lib}");
+        }
+    } else if target == "x86_64-pc-windows-gnu" || target == "x86_64-pc-windows-gnullvm" {
+        // The MinGW C++ runtime chain plus the Windows system libraries
+        // the C++ objects reference (boost.process → shell32/psapi,
+        // OpenSSL's CAPI engine → crypt32, sockets → ws2_32, and the
+        // usual bcrypt/ole32/uuid/advapi32 tail).
+        for lib in [
+            "stdc++", "gcc", "gcc_eh", "pthread",
+            "shell32", "psapi", "crypt32", "ws2_32", "bcrypt", "ole32", "uuid", "advapi32",
+        ] {
             println!("cargo:rustc-link-lib={lib}");
         }
     }
@@ -366,6 +393,9 @@ fn default_triplet(target: &str) -> String {
         "x86_64-pc-windows-msvc" => "x64-windows-static-md",
         "aarch64-pc-windows-msvc" => "arm64-windows-static-md",
         "x86_64-pc-windows-gnullvm" => "x64-mingw-static",
+        // The msys ruby legs link with mingw-gcc: the same MinGW triplet
+        // (dwarfs-t's overlay ships it); the CRT is ucrt on both sides.
+        "x86_64-pc-windows-gnu" => "x64-mingw-static",
         other => panic!(
             "no default vcpkg triplet for target {other}; set DWARFS_RS_VCPKG_TRIPLET explicitly"
         ),
@@ -405,7 +435,22 @@ fn lib_stem(dir: &Path, name: &str) -> Option<String> {
     } else if dir.join(format!("lib{name}.lib")).exists() {
         Some(format!("lib{name}"))
     } else {
-        None
+        // MinGW's boost naming (vcpkg's autoconfig convention):
+        // libboost_x-<toolset>-mt-<arch>-<ver>.a — the stem the linker
+        // wants drops the `lib` prefix but keeps the suffix.
+        let prefix = format!("lib{name}-");
+        std::fs::read_dir(dir).ok()?.find_map(|e| {
+            let e = e.ok()?;
+            let fname = e.file_name().to_string_lossy().into_owned();
+            if fname.starts_with(&prefix) && fname.ends_with(".a") {
+                fname
+                    .strip_prefix("lib")
+                    .and_then(|f| f.strip_suffix(".a"))
+                    .map(str::to_string)
+            } else {
+                None
+            }
+        })
     }
 }
 
