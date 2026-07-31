@@ -156,6 +156,12 @@ jobs:
     runs-on: windows-latest
     env:
       CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER: gcc.exe
+      # Static-link the MinGW C++ runtimes: the runner carries several
+      # mingw installs (choco mingw, Strawberry perl's old gcc, …) and the
+      # loader picks the FIRST libstdc++/libgcc/winpthread DLL on PATH —
+      # a version mismatch there is STATUS_ENTRYPOINT_NOT_FOUND at
+      # process start (proven on the smoke-test leg).
+      RUSTFLAGS: -C link-arg=-static -C link-arg=-static-libgcc -C link-arg=-static-libstdc++
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
