@@ -27,11 +27,27 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-14]
+        include:
+          - { os: ubuntu-24.04, triplet: x64-linux-static, vcpkg_inst: /home/runner/vcpkg-inst }
+          - { os: macos-14, triplet: arm64-osx-static, vcpkg_inst: /Users/runner/vcpkg-inst }
+    env:
+      # The baseline artifact's canonical root (see the restore step) —
+      # vcpkg trees embed absolute paths, so consumers must not relocate.
+      DWARFS_RS_VCPKG_INSTALLED_DIR: ${{ matrix.vcpkg_inst }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           submodules: recursive
+
+      - name: Restore the vcpkg baseline (dwarfs-t is the single writer)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # Never fails the leg: a miss means the ports build normally.
+        run: |
+          bash dwarfs-t/ci/vcpkg-baseline-restore.sh dwarfs-t \
+            "${{ matrix.triplet }}" "${{ matrix.vcpkg_inst }}" \
+            || echo "baseline miss — ports build normally"
 
       - name: Install toolchain (rustup)
         uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
@@ -170,6 +186,16 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           submodules: recursive
+
+      - name: Restore the vcpkg baseline (dwarfs-t is the single writer)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # Never fails the leg: a miss means the ports build normally.
+        run: |
+          bash dwarfs-t/ci/vcpkg-baseline-restore.sh dwarfs-t \
+            x64-mingw-static "${{ env.DWARFS_RS_VCPKG_INSTALLED_DIR }}" \
+            || echo "baseline miss — ports build normally"
 
       - name: Install toolchain (rustup)
         uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
