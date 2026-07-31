@@ -197,7 +197,7 @@ jobs:
             vcpkg-archives-${{ runner.os }}-mingw-
 
       - name: Cache the cargo target dir
-        uses: Swatinem/rust-cache@9d47c88ad934b5cefd8e0c376e7d226daca89ee3 # v2.7.5
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2.9.1
         with:
           workspaces: |
             .
