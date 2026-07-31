@@ -29,4 +29,4 @@ for exe in target/x86_64-pc-windows-gnu/debug/deps/*.exe; do
 done
 
 # --- 3. test (serialized) ---------------------------------------------------
-exec cargo test --workspace --target x86_64-pc-windows-gnu -- "$SERIAL"
+exec cargo test --workspace --target x86_64-pc-windows-gnu -- "$SERIAL" --nocapture
