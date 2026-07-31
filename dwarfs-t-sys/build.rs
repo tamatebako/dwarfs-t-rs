@@ -175,8 +175,12 @@ fn main() {
     }
 
     // ---------------------------------------------------------------
-    // Locate the dwarfs-t sources (vendored submodule by default)
-    // ---------------------------------------------------------------
+    // Locate the dwarfs-t sources (vendored submodule by default). The
+    // paths cargo hands us are already absolute; do NOT canonicalize —
+    // on Windows that yields the `\\?\D:\` verbatim form, which the
+    // mingw toolchain cannot parse (proven on windows-latest:
+    // `dwarfs_c.h: No such file or directory` from abi_check.c with the
+    // submodule present).
     let dwarfs_t = env::var("DWARFS_RS_DWARFS_T_SOURCE")
         .map(PathBuf::from)
         .unwrap_or_else(|_| {
@@ -189,12 +193,6 @@ fn main() {
                 manifest_dir.join("../dwarfs-t")
             }
         });
-    let dwarfs_t = dwarfs_t.canonicalize().unwrap_or_else(|e| {
-        panic!(
-            "dwarfs-t source dir {} not accessible: {e}",
-            dwarfs_t.display()
-        )
-    });
     let header = dwarfs_t.join("include/dwarfs_c.h");
     println!("cargo:rerun-if-changed={}", header.display());
     if !header.exists() {
