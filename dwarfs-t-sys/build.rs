@@ -324,15 +324,10 @@ fn main() {
                 .arg("-DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY");
         }
         // vcpkg's autotools ports (the libiconv/openssl family) install via
-        // msys2 `make -j N install` — parallel INSTALL is a proven failure
-        // class on GitHub's windows runners (the packages compile, then
-        // `make -j 5 install` dies mid-install; we lost three consecutive
-        // legs to it: libiconv, libsodium, openssl). Serialize the port
-        // builds on Windows hosts; the archives cache amortizes the cost.
-        // The user's own VCPKG_MAX_CONCURRENCY always wins.
-        if cfg!(windows) && env::var("VCPKG_MAX_CONCURRENCY").is_err() {
-            cmd.env("VCPKG_MAX_CONCURRENCY", "1");
-        }
+        // msys2 make. Parallel installs died when setup-msys2's runtime sat
+        // on PATH next to vcpkg's own msys2 (an ABI clash, misdiagnosed as a
+        // make-parallelism race — the clash is gone now). Parallel builds
+        // are back; VCPKG_MAX_CONCURRENCY stays user-overridable.
         run(cmd, verbose, "cmake configure");
     }
 
