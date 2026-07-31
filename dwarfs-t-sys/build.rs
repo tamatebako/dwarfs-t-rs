@@ -26,6 +26,10 @@
 //! - `DWARFS_RS_VCPKG_TRIPLET` — vcpkg triplet; default is derived from the
 //!   Rust target (e.g. `arm64-osx-static`, `x64-linux-static`,
 //!   `x64-windows-static-md`).
+//! - `DWARFS_RS_VCPKG_INSTALLED_DIR` — the installed tree's root (default:
+//!   `vcpkg_installed` inside the cargo build dir). Pin a SHORT absolute
+//!   path on Windows: the default root pushes boost's deepest headers past
+//!   MAX_PATH (260), and mingw gcc cannot open them.
 //! - `DWARFS_RS_CMAKE_BUILD_TYPE` — default `Release`.
 //! - `DWARFS_RS_VERBOSE=1` — stream CMake output instead of swallowing it.
 //!
@@ -99,6 +103,7 @@ fn main() {
         "DWARFS_RS_VCPKG_ROOT",
         "VCPKG_ROOT",
         "DWARFS_RS_VCPKG_TRIPLET",
+        "DWARFS_RS_VCPKG_INSTALLED_DIR",
         "DWARFS_RS_CMAKE_BUILD_TYPE",
     ] {
         println!("cargo:rerun-if-env-changed={var}");
@@ -246,6 +251,15 @@ fn main() {
         panic!("ninja not found in PATH; install ninja (required on Windows)");
     };
 
+    // The installed tree's root. On Windows the default (vcpkg_installed
+    // inside the cargo build dir) pushes boost's deepest headers past
+    // MAX_PATH (260) and mingw gcc cannot OPEN them — the repo name
+    // length decides which boost header dies first (proven:
+    // numeric_cast_traits_common.hpp at 274 chars on the factory leg).
+    // DWARFS_RS_VCPKG_INSTALLED_DIR pins a SHORT absolute root on CI.
+    let installed_dir = env::var("DWARFS_RS_VCPKG_INSTALLED_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| build_dir.join("vcpkg_installed"));
     if !build_dir.join("CMakeCache.txt").exists() {
         let mut cmd = Command::new("cmake");
         cmd.arg("-S")
@@ -256,6 +270,10 @@ fn main() {
             .arg(format!("-DCMAKE_BUILD_TYPE={build_type}"))
             .arg(format!("-DCMAKE_TOOLCHAIN_FILE={}", toolchain.display()))
             .arg(format!("-DVCPKG_TARGET_TRIPLET={triplet}"))
+            .arg(format!(
+                "-DVCPKG_INSTALLED_DIR={}",
+                installed_dir.display()
+            ))
             .arg(format!(
                 "-DVCPKG_OVERLAY_PORTS={}",
                 dwarfs_t.join("vcpkg_ports").display()
@@ -333,7 +351,7 @@ fn main() {
     // ---------------------------------------------------------------
     // Emit link instructions
     // ---------------------------------------------------------------
-    let vcpkg_lib = build_dir.join("vcpkg_installed").join(&triplet).join("lib");
+    let vcpkg_lib = installed_dir.join(&triplet).join("lib");
     println!("cargo:rustc-link-search=native={}", build_dir.display());
     println!("cargo:rustc-link-search=native={}", vcpkg_lib.display());
 

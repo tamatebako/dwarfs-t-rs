@@ -162,6 +162,10 @@ jobs:
       # a version mismatch there is STATUS_ENTRYPOINT_NOT_FOUND at
       # process start (proven on the smoke-test leg).
       RUSTFLAGS: -C link-arg=-static -C link-arg=-static-libgcc -C link-arg=-static-libstdc++
+      # Short installed-tree root: the default (inside the cargo build
+      # dir) pushes boost's deepest headers past MAX_PATH and mingw gcc
+      # cannot open them.
+      DWARFS_RS_VCPKG_INSTALLED_DIR: C:/vcpkg-inst
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
