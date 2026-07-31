@@ -29,4 +29,12 @@ for exe in target/x86_64-pc-windows-gnu/debug/deps/*.exe; do
 done
 
 # --- 3. test (serialized) ---------------------------------------------------
-exec cargo test --workspace --target x86_64-pc-windows-gnu -- "$SERIAL" --nocapture
+if ! cargo test --workspace --target x86_64-pc-windows-gnu -- "$SERIAL" --nocapture; then
+  # a segfault yields only STATUS_ACCESS_VIOLATION from the cargo harness —
+  # rerun the crashing binary under gdb batch for the C++ backtrace.
+  echo "=== test failed — rerunning the smoke binary under gdb ==="
+  SMOKE_EXE="$(ls target/x86_64-pc-windows-gnu/debug/deps/smoke-*.exe | head -1)"
+  gdb -batch -ex run -ex bt -ex "info registers" \
+    --args "$SMOKE_EXE" --test-threads=1 || true
+  exit 1
+fi
