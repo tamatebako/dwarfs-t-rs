@@ -213,7 +213,7 @@ jobs:
         run: |
           export PATH="/c/mingw64/bin:/c/Users/runneradmin/.cargo/bin:$PATH"
           # serialize: a parallel harness hides which test crashes
-          cargo test --workspace --target x86_64-pc-windows-gnu -- --test-threads=1 --no-run
+          cargo test --workspace --target x86_64-pc-windows-gnu --no-run
           # STATUS_ENTRYPOINT_NOT_FOUND forensics: enumerate every DLL the
           # test binaries import (the loader fails the process before main,
           # so the failure's own stderr never names the missing entry).
