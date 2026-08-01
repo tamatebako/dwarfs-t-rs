@@ -48,10 +48,31 @@ unsafe impl Send for Filesystem {}
 unsafe impl Sync for Filesystem {}
 
 impl Filesystem {
+    /// The spec-18 C20 bind-time check: the library's reported ABI
+    /// version must equal the bindings' pin. A stale prebuilt lib is a
+    /// named error with both numbers, never a call into the wrong layout.
+    pub(crate) fn abi_check() -> Result<(), DwarfsError> {
+        // SAFETY: always safe to call.
+        let lib = unsafe { dwarfs_t_sys::dwarfs_c_abi_version() };
+        if lib == dwarfs_t_sys::DWARFS_C_ABI_VERSION {
+            Ok(())
+        } else {
+            Err(DwarfsError::new(
+                libc::ENOTSUP,
+                format!(
+                    "dwarfs_c ABI mismatch: the library reports version {lib}, \
+                     these bindings expect {} — rebuild against the matching dwarfs-t",
+                    dwarfs_t_sys::DWARFS_C_ABI_VERSION
+                ),
+            ))
+        }
+    }
+
     fn from_raw(
         handle: *mut dwarfs_c_filesystem,
         memory: Option<Vec<u8>>,
     ) -> Result<Self, DwarfsError> {
+        Self::abi_check()?;
         match NonNull::new(handle) {
             Some(handle) => Ok(Filesystem {
                 handle,

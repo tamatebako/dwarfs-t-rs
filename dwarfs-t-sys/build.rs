@@ -200,6 +200,15 @@ fn main() {
         });
     let header = dwarfs_t.join("include/dwarfs_c.h");
     println!("cargo:rerun-if-changed={}", header.display());
+    // The C++ sources drive the archive's contents: an edit that does not
+    // retrigger is a silent stale link (the dwarfs_c_abi_version incident:
+    // the new symbol was invisible until a cargo clean). Watch the tree.
+    for entry in std::fs::read_dir(dwarfs_t.join("src")).unwrap() {
+        let path = entry.unwrap().path();
+        if path.extension().is_some_and(|ext| ext == "cpp") {
+            println!("cargo:rerun-if-changed={}", path.display());
+        }
+    }
     if !header.exists() {
         panic!(
             "dwarfs_c.h not found at {}.\n\

@@ -132,6 +132,7 @@ pub struct Writer {
 
 impl Writer {
     fn from_raw(raw: &dwarfs_c_writer_options) -> Result<Self, DwarfsError> {
+        crate::fs::Filesystem::abi_check()?;
         // SAFETY: raw points to a fully initialized options struct whose
         // struct_version we stamped ourselves.
         let handle = unsafe { dwarfs_t_sys::dwarfs_c_writer_create(raw) };

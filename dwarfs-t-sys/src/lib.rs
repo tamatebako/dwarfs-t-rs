@@ -64,6 +64,10 @@ pub const DWARFS_C_FILE_OTHER: c_int = 4;
 /// Pass as offset to [`dwarfs_c_open_region`] to auto-detect the image start.
 pub const DWARFS_C_OFFSET_AUTO: i64 = -1;
 
+/// The dwarfs_c ABI version these bindings pin (spec 18 C20): checked
+/// against `dwarfs_c_abi_version()` at use; a mismatch is refused.
+pub const DWARFS_C_ABI_VERSION: c_int = 1;
+
 /// Opaque writer handle (`struct dwarfs_c_writer`).
 ///
 /// Owned by the caller; release with [`dwarfs_c_writer_free`]. Not
@@ -157,6 +161,10 @@ extern "C" {
 
     /// Borrowed, static version string (e.g. the git description).
     pub fn dwarfs_c_version_string() -> *const c_char;
+
+    /// The dwarfs_c ABI version (spec 18 C20): bumped on any
+    /// ABI-breaking change; the bindings pin it and refuse mismatches.
+    pub fn dwarfs_c_abi_version() -> c_int;
 
     /// Open a DwarFS image from a file. NULL on error.
     pub fn dwarfs_c_open(path: *const c_char) -> *mut dwarfs_c_filesystem;
@@ -304,6 +312,10 @@ mod skeleton {
 
     pub unsafe fn dwarfs_c_version_string() -> *const c_char {
         SKELETON_VERSION.as_ptr().cast()
+    }
+
+    pub unsafe fn dwarfs_c_abi_version() -> c_int {
+        DWARFS_C_ABI_VERSION
     }
 
     pub unsafe fn dwarfs_c_open(_path: *const c_char) -> *mut dwarfs_c_filesystem {
