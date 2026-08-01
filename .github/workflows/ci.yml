@@ -183,7 +183,7 @@ jobs:
           submodules: recursive
 
       - name: Set up MSys2 (ucrt64 toolchain)
-        uses: msys2/setup-msys2@2b679eae0dfb7c68c8dbb425db97e33565362826 # v2.29.0
+        uses: msys2/setup-msys2@66cd2cce69caa17b53920067426061ca1de3a884 # v2
         with:
           msystem: ucrt64
           path-type: minimal
