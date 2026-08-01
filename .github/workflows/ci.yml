@@ -188,7 +188,7 @@ jobs:
           msystem: ucrt64
           path-type: minimal
           update: true
-          install: mingw-w64-ucrt-x86_64-toolchain mingw-w64-ucrt-x86_64-gdb
+          install: mingw-w64-ucrt-x86_64-toolchain mingw-w64-ucrt-x86_64-gdb mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-ninja
 
       - name: Restore the vcpkg baseline (dwarfs-t is the single writer)
         shell: bash
@@ -205,12 +205,9 @@ jobs:
         with:
           targets: x86_64-pc-windows-gnu
 
-      - name: Install CMake and Ninja
-        uses: lukka/get-cmake@latest
-        with:
-          cmakeVersion: latest
-          ninjaVersion: latest
-
+      # cmake + ninja come from the ucrt64 toolchain (setup-msys2 above):
+      # the closed PATH discipline in ci/windows-gnu.sh deliberately
+      # excludes every other bin dir, so get-cmake's paths would be dead.
       - name: Set up vcpkg
         uses: lukka/run-vcpkg@b1a0dd252f06b9e25b3c022a9a03bd7a427fb6a2 # v11.6
         with:
