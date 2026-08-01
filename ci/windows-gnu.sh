@@ -8,7 +8,10 @@
 # calls this file.
 set -euo pipefail
 
-export PATH="/c/mingw64/bin:/c/Users/runneradmin/.cargo/bin:$PATH"
+# The factory's proven PATH: ucrt64 gcc first; Git's /usr/bin for
+# coreutils (safe — the ABI clash is specifically setup-msys2's
+# /usr/bin, which stays OFF); git.exe from Git's /cmd; no choco mingw.
+export PATH="/d/a/_temp/msys64/ucrt64/bin:/c/Program Files/Git/usr/bin:/c/Program Files/Git/cmd:/c/Users/runneradmin/.cargo/bin:/c/Windows/System32"
 
 # The serialize note: a parallel harness hides which test crashes
 # (windows-gnu legs died twice to a hidden segfault before this rule).

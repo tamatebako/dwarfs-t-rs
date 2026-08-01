@@ -157,35 +157,38 @@ jobs:
         run: cargo clippy --workspace --all-targets --no-default-features --target x86_64-pc-windows-msvc -- -D warnings
 
   # The vendored windows-gnu (ucrt64) leg: dwarfs-t cross-compiles with
-  # the mingw toolchain and the safe crate links and tests on the runner
-  # itself (windows-latest runs the PE binaries natively). The CRT note
-  # above (x64-windows-static-md, /MD) is the MSVC flavor — the ucrt64
-  # flavor is this one.
-  #
-  # Environment: dwarfs-t's own green windows-gcc CI shape — Git-bash
-  # steps + the runner's built-in MinGW + get-cmake, NEVER an msys2
-  # shell: vcpkg's autotools ports (the libiconv/openssl family) die in
-  # `make install` when the port build is spawned from an msys2 shell
-  # (three consecutive factory legs lost to it).
+  # the msys2 ucrt64 gcc (ONE toolchain across the ecosystem — the
+  # factory's ruby link uses it; the choco mingw's emutls/pthread_once
+  # internals differ and the skew crashes worker threads at runtime).
+  # Git-bash steps + get-cmake; setup-msys2's /usr/bin stays OFF PATH
+  # (vcpkg's downloaded msys2 ABI-clashes with it — the autotools ports
+  # die in `make install` otherwise).
   windows-gnu:
     name: vendored (windows, ucrt64)
     runs-on: windows-latest
     env:
       CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER: gcc.exe
-      # Static-link the MinGW C++ runtimes: the runner carries several
-      # mingw installs (choco mingw, Strawberry perl's old gcc, …) and the
-      # loader picks the FIRST libstdc++/libgcc/winpthread DLL on PATH —
-      # a version mismatch there is STATUS_ENTRYPOINT_NOT_FOUND at
-      # process start (proven on the smoke-test leg).
-      RUSTFLAGS: -C link-arg=-static-libgcc -C link-arg=-static-libstdc++ -C link-arg=-Wl,-Bstatic,--whole-archive -C link-arg=-lwinpthread -C link-arg=-Wl,--no-whole-archive,-Bdynamic -C link-arg=-lmingwex -C link-arg=-lmsvcrt -C link-arg=-lkernel32
+      # Static-link the mingw C++ runtimes (first-DLL-wins resolution on
+      # the runner is STATUS_ENTRYPOINT_NOT_FOUND at process start);
+      # trailing -lmsvcrt restores the msvcrt-after-mingwex order
+      # invariant rustc's -nodefaultlibs tail violates (factory probe).
+      RUSTFLAGS: -C link-arg=-static-libgcc -C link-arg=-static-libstdc++ -C link-arg=-lmsvcrt
       # Short installed-tree root: the default (inside the cargo build
       # dir) pushes boost's deepest headers past MAX_PATH and mingw gcc
-      # cannot open them.
+      # cannot open them. Also the baseline artifact's canonical root.
       DWARFS_RS_VCPKG_INSTALLED_DIR: C:/vcpkg-inst
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           submodules: recursive
+
+      - name: Set up MSys2 (ucrt64 toolchain)
+        uses: msys2/setup-msys2@2b679eae0dfb7c68c8dbb425db97e33565362826 # v2.29.0
+        with:
+          msystem: ucrt64
+          path-type: minimal
+          update: true
+          install: mingw-w64-ucrt-x86_64-toolchain mingw-w64-ucrt-x86_64-gdb
 
       - name: Restore the vcpkg baseline (dwarfs-t is the single writer)
         shell: bash
