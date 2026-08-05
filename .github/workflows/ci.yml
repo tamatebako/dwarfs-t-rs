@@ -24,6 +24,12 @@ jobs:
   test:
     name: test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    permissions:
+      # packages:write populates the org's GitHub Packages vcpkg binary
+      # cache (ci/vcpkg-nuget-cache.sh); fork PRs are auto-downgraded to
+      # read-only, where pushes degrade to a non-fatal vcpkg note.
+      contents: read
+      packages: write
     strategy:
       fail-fast: false
       matrix:
@@ -52,12 +58,15 @@ jobs:
 
       - name: Install native build tools (ubuntu)
         if: runner.os == 'Linux'
+        # mono-complete: vcpkg's NuGet binary-cache provider drives
+        # nuget.exe through mono on non-Windows (macos runners ship mono).
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             build-essential cmake ninja-build pkg-config \
             autoconf automake autoconf-archive libtool \
-            curl zip unzip tar ca-certificates
+            curl zip unzip tar ca-certificates \
+            mono-complete
 
       - name: Install native build tools (macos)
         if: runner.os == 'macOS'
@@ -69,15 +78,16 @@ jobs:
           vcpkgGitCommitId: ${{ env.VCPKG_COMMIT }}
           vcpkgDirectory: ${{ github.workspace }}/.vcpkg-root
 
-      - name: Cache vcpkg package archives
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: |
-            ~/.cache/vcpkg
-            ~/Library/Caches/vcpkg
-          key: vcpkg-archives-${{ runner.os }}-${{ hashFiles('dwarfs-t/vcpkg.json', 'dwarfs-t/vcpkg_ports/**', 'dwarfs-t/vcpkg_triplets/**') }}
-          restore-keys: |
-            vcpkg-archives-${{ runner.os }}-
+      # run-vcpkg@v11 injects VCPKG_BINARY_SOURCES=clear;x-gha,readwrite,
+      # and vcpkg removed x-gha (2025.06) — that spec is zero binary cache,
+      # and it also neutered the old actions/cache over the archives dir
+      # (files provider cleared + archives path redirected). The override
+      # is the org's GitHub Packages NuGet feed; the dead cache step is
+      # gone (details in ci/vcpkg-nuget-cache.sh).
+      - name: Configure the vcpkg binary cache (GitHub Packages NuGet)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash ci/vcpkg-nuget-cache.sh
 
       - name: cargo test
         env:
@@ -164,6 +174,12 @@ jobs:
   windows-gnu:
     name: vendored (windows, ucrt64)
     runs-on: windows-latest
+    permissions:
+      # packages:write populates the org's GitHub Packages vcpkg binary
+      # cache (ci/vcpkg-nuget-cache.sh); fork PRs are auto-downgraded to
+      # read-only, where pushes degrade to a non-fatal vcpkg note.
+      contents: read
+      packages: write
     env:
       CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER: gcc.exe
       # Static-link the mingw C++ runtimes (first-DLL-wins resolution on
@@ -210,13 +226,14 @@ jobs:
           vcpkgGitCommitId: ${{ env.VCPKG_COMMIT }}
           vcpkgDirectory: ${{ github.workspace }}/.vcpkg-root
 
-      - name: Cache vcpkg package archives
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/AppData/Local/vcpkg/archives
-          key: vcpkg-archives-${{ runner.os }}-mingw-${{ hashFiles('dwarfs-t/vcpkg.json', 'dwarfs-t/vcpkg_ports/**', 'dwarfs-t/vcpkg_triplets/**') }}
-          restore-keys: |
-            vcpkg-archives-${{ runner.os }}-mingw-
+      # See the test job: run-vcpkg's injected x-gha spec is zero binary
+      # cache since vcpkg 2025.06 removed the provider; the org's GitHub
+      # Packages NuGet feed replaces it (ci/vcpkg-nuget-cache.sh).
+      - name: Configure the vcpkg binary cache (GitHub Packages NuGet)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash ci/vcpkg-nuget-cache.sh
 
       - name: Cache the cargo target dir
         uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
