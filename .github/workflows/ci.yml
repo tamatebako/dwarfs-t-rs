@@ -75,9 +75,9 @@ jobs:
           path: |
             ~/.cache/vcpkg
             ~/Library/Caches/vcpkg
-          key: vcpkg-archives-${{ runner.os }}-${{ hashFiles('dwarfs-t/vcpkg.json', 'dwarfs-t/vcpkg_ports/**', 'dwarfs-t/vcpkg_triplets/**') }}
+          key: vcpkg-archives-${{ runner.os }}-${{ matrix.triplet }}-${{ hashFiles('dwarfs-t/vcpkg.json', 'dwarfs-t/vcpkg_ports/**', 'dwarfs-t/vcpkg_triplets/**') }}
           restore-keys: |
-            vcpkg-archives-${{ runner.os }}-
+            vcpkg-archives-${{ runner.os }}-${{ matrix.triplet }}-
 
       - name: cargo test
         env:
@@ -214,15 +214,18 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/AppData/Local/vcpkg/archives
-          key: vcpkg-archives-${{ runner.os }}-mingw-${{ hashFiles('dwarfs-t/vcpkg.json', 'dwarfs-t/vcpkg_ports/**', 'dwarfs-t/vcpkg_triplets/**') }}
+          key: vcpkg-archives-${{ runner.os }}-x64-mingw-static-${{ hashFiles('dwarfs-t/vcpkg.json', 'dwarfs-t/vcpkg_ports/**', 'dwarfs-t/vcpkg_triplets/**') }}
           restore-keys: |
-            vcpkg-archives-${{ runner.os }}-mingw-
+            vcpkg-archives-${{ runner.os }}-x64-mingw-static-
 
       - name: Cache the cargo target dir
         uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
           workspaces: |
             .
+          # Triplet-scoped, never the default job+lockfile key — this job
+          # builds x64-mingw-static only, and the key names it.
+          key: windows-gnu-x64-mingw-static
 
       - name: cargo build + test (vendored, windows-gnu)
         shell: bash
