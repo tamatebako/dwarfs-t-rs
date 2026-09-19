@@ -221,10 +221,16 @@ fn main() {
     }
 
     // ---------------------------------------------------------------
-    // ABI cross-check of the hand-written FFI declarations (cheap)
+    // ABI cross-check of the hand-written FFI declarations (cheap).
+    // The asserts are C11 (_Static_assert); cc-rs drives MSVC's cl with
+    // no /std flag and the default C mode rejects them (C2059 on every
+    // assert — proven on the tebako windows-arm64 leg, run 35424024604).
+    // gcc/clang accept -std=c11 identically, so the standard is pinned
+    // for every toolchain.
     // ---------------------------------------------------------------
     cc::Build::new()
         .file("abi_check.c")
+        .std("c11")
         .include(dwarfs_t.join("include"))
         .compile("dwarfs_c_abi_check");
 
