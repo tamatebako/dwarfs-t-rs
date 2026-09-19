@@ -491,28 +491,36 @@ fn lib_stem(dir: &Path, name: &str) -> Option<String> {
         // - MinGW (autoconfig convention): libboost_x-<toolset>-mt-<arch>-<ver>.a
         //   — the stem the linker wants drops the `lib` prefix but keeps
         //   the suffix.
-        // - MSVC: libboost_x-vc<ver>-mt[-s]-<arch>.lib — link.exe wants the
-        //   FULL archive name, so the stem only drops the `.lib` suffix
-        //   (without this arm the boost archives were never emitted on the
-        //   MSVC path: the tfs.dll link died on 30 unresolved
+        // - MSVC (versioned layout, vcpkg's remove-prefix patch):
+        //   boost_x-vc<ver>-mt[-s]-<arch>.lib — NO `lib` prefix (the
+        //   patch strips it), link.exe wants the FULL archive name, so
+        //   the stem only drops the `.lib` suffix. (Without these arms
+        //   no boost library was ever emitted on the MSVC path: the
+        //   tfs.dll link died on 30 unresolved
         //   boost::{program_options,chrono,filesystem} externals, tebako
-        //   windows-arm64 run 35434997227).
-        let prefix = format!("lib{name}-");
+        //   windows-arm64 runs 35434997227/35436049465/35436664227.)
+        let prefixed = format!("lib{name}-");
+        let plain = format!("{name}-");
         let mut candidates = vec![dir.to_path_buf()];
         candidates.push(dir.join("manual-link"));
         candidates.iter().find_map(|d| {
             std::fs::read_dir(d).ok()?.find_map(|e| {
                 let e = e.ok()?;
                 let fname = e.file_name().to_string_lossy().into_owned();
-                if fname.starts_with(&prefix) && fname.ends_with(".a") {
+                let matched = fname.ends_with(".a")
+                    && (fname.starts_with(&prefixed) || fname.starts_with(&plain))
+                    || fname.ends_with(".lib")
+                        && (fname.starts_with(&prefixed) || fname.starts_with(&plain));
+                if !matched {
+                    return None;
+                }
+                if fname.ends_with(".a") {
                     fname
                         .strip_prefix("lib")
                         .and_then(|f| f.strip_suffix(".a"))
                         .map(str::to_string)
-                } else if fname.starts_with(&prefix) && fname.ends_with(".lib") {
-                    fname.strip_suffix(".lib").map(str::to_string)
                 } else {
-                    None
+                    fname.strip_suffix(".lib").map(str::to_string)
                 }
             })
         })
