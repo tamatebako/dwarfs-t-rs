@@ -361,6 +361,15 @@ fn main() {
     let vcpkg_lib = installed_dir.join(&triplet).join("lib");
     println!("cargo:rustc-link-search=native={}", build_dir.display());
     println!("cargo:rustc-link-search=native={}", vcpkg_lib.display());
+    // vcpkg's boost ports install the toolset-suffixed auto-link
+    // archives under lib/manual-link/ (kept out of lib/ so toolchain
+    // auto-linking cannot hijack plain consumers) — the tfs link needs
+    // that directory on the search path too (tebako windows-arm64 run
+    // 35436049465: every boost archive sat there, unresolved).
+    let vcpkg_manual_link = vcpkg_lib.join("manual-link");
+    if vcpkg_manual_link.is_dir() {
+        println!("cargo:rustc-link-search=native={}", vcpkg_manual_link.display());
+    }
 
     for (lib, required) in DWARFS_LIBS {
         if *required {
@@ -489,19 +498,23 @@ fn lib_stem(dir: &Path, name: &str) -> Option<String> {
         //   boost::{program_options,chrono,filesystem} externals, tebako
         //   windows-arm64 run 35434997227).
         let prefix = format!("lib{name}-");
-        std::fs::read_dir(dir).ok()?.find_map(|e| {
-            let e = e.ok()?;
-            let fname = e.file_name().to_string_lossy().into_owned();
-            if fname.starts_with(&prefix) && fname.ends_with(".a") {
-                fname
-                    .strip_prefix("lib")
-                    .and_then(|f| f.strip_suffix(".a"))
-                    .map(str::to_string)
-            } else if fname.starts_with(&prefix) && fname.ends_with(".lib") {
-                fname.strip_suffix(".lib").map(str::to_string)
-            } else {
-                None
-            }
+        let mut candidates = vec![dir.to_path_buf()];
+        candidates.push(dir.join("manual-link"));
+        candidates.iter().find_map(|d| {
+            std::fs::read_dir(d).ok()?.find_map(|e| {
+                let e = e.ok()?;
+                let fname = e.file_name().to_string_lossy().into_owned();
+                if fname.starts_with(&prefix) && fname.ends_with(".a") {
+                    fname
+                        .strip_prefix("lib")
+                        .and_then(|f| f.strip_suffix(".a"))
+                        .map(str::to_string)
+                } else if fname.starts_with(&prefix) && fname.ends_with(".lib") {
+                    fname.strip_suffix(".lib").map(str::to_string)
+                } else {
+                    None
+                }
+            })
         })
     }
 }
