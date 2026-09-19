@@ -375,17 +375,27 @@ fn main() {
         }
     }
 
-    // C++ runtime + platform extras. windows-msvc needs nothing explicit:
-    // MSVC-compiled objects record their CRT/C++ runtime default libraries
-    // (msvcprt, msvcrt, vcruntime) in .drectve sections, and the /MD vs /MT
-    // choice is enforced by the CRT probe above. windows-gnu links the
-    // MinGW C++ runtime chain (stdc++/gcc_eh/pthread are what the C++
-    // objects reference).
+    // C++ runtime + platform extras. windows-msvc: the CRT/C++ runtime
+    // defaults flow from the objects' .drectve sections (the /MD vs /MT
+    // choice is enforced by the CRT probe above), but the Windows SDK
+    // libraries the vendored closure references do NOT — without this
+    // tail the tfs.dll link died on shell32 (boost::process's
+    // SHGetFileInfoW), psapi (dwarfs' GetProcessMemoryInfo) and crypt32
+    // (openssl's CAPI engine + botan's certstor_system_windows), run
+    // 35434997227. windows-gnu links the MinGW C++ runtime chain
+    // (stdc++/gcc_eh/pthread are what the C++ objects reference) plus
+    // the same SDK set.
     if target.contains("apple") {
         println!("cargo:rustc-link-lib=c++");
     } else if target.contains("linux") || target.contains("android") {
         println!("cargo:rustc-link-lib=stdc++");
         for lib in ["pthread", "dl", "m"] {
+            println!("cargo:rustc-link-lib={lib}");
+        }
+    } else if target.contains("windows-msvc") {
+        for lib in [
+            "shell32", "psapi", "crypt32", "ws2_32", "bcrypt", "ole32", "uuid", "advapi32",
+        ] {
             println!("cargo:rustc-link-lib={lib}");
         }
     } else if target == "x86_64-pc-windows-gnu" || target == "x86_64-pc-windows-gnullvm" {
@@ -468,9 +478,16 @@ fn lib_stem(dir: &Path, name: &str) -> Option<String> {
     } else if dir.join(format!("lib{name}.lib")).exists() {
         Some(format!("lib{name}"))
     } else {
-        // MinGW's boost naming (vcpkg's autoconfig convention):
-        // libboost_x-<toolset>-mt-<arch>-<ver>.a — the stem the linker
-        // wants drops the `lib` prefix but keeps the suffix.
+        // Suffixed vcpkg-boost naming, per toolchain:
+        // - MinGW (autoconfig convention): libboost_x-<toolset>-mt-<arch>-<ver>.a
+        //   — the stem the linker wants drops the `lib` prefix but keeps
+        //   the suffix.
+        // - MSVC: libboost_x-vc<ver>-mt[-s]-<arch>.lib — link.exe wants the
+        //   FULL archive name, so the stem only drops the `.lib` suffix
+        //   (without this arm the boost archives were never emitted on the
+        //   MSVC path: the tfs.dll link died on 30 unresolved
+        //   boost::{program_options,chrono,filesystem} externals, tebako
+        //   windows-arm64 run 35434997227).
         let prefix = format!("lib{name}-");
         std::fs::read_dir(dir).ok()?.find_map(|e| {
             let e = e.ok()?;
@@ -480,6 +497,8 @@ fn lib_stem(dir: &Path, name: &str) -> Option<String> {
                     .strip_prefix("lib")
                     .and_then(|f| f.strip_suffix(".a"))
                     .map(str::to_string)
+            } else if fname.starts_with(&prefix) && fname.ends_with(".lib") {
+                fname.strip_suffix(".lib").map(str::to_string)
             } else {
                 None
             }
