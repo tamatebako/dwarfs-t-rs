@@ -368,7 +368,10 @@ fn main() {
     // 35436049465: every boost archive sat there, unresolved).
     let vcpkg_manual_link = vcpkg_lib.join("manual-link");
     if vcpkg_manual_link.is_dir() {
-        println!("cargo:rustc-link-search=native={}", vcpkg_manual_link.display());
+        println!(
+            "cargo:rustc-link-search=native={}",
+            vcpkg_manual_link.display()
+        );
     }
 
     for (lib, required) in DWARFS_LIBS {
